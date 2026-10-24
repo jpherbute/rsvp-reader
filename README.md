@@ -10,6 +10,8 @@ alignée sur un axe fixe (technique RSVP).
   déplaçable), titre/chapitre, contexte, vitesse, navigation.
 - Pas à pas : boutons ‹ › (appui long = répétition), `«` `»` = phrase précédente/suivante.
   Clavier : `←` `→` (±1 mot, `Maj` = ±10), `↑` `↓` (vitesse), `Échap` (bibliothèque).
+- Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre. Ils viennent de la table
+  des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT, les lignes du type « CHAPITRE IV. », « Livre premier »…
 - Vitesse : 100 à 1000 mots/min. Le rythme s'adapte : mots longs, virgules, fins de phrase et de paragraphe,
   et une courte accélération progressive à chaque reprise.
 - Thème clair (par défaut) / sombre, taille du texte (`Aa`).
@@ -44,4 +46,4 @@ vendor/jszip.min.js   lecture des EPUB (JSZip, MIT)
 
 ## Idées suivantes
 
-Liste de chapitres, import PDF, statistiques de lecture, synchronisation entre appareils.
+Import PDF, statistiques de lecture, synchronisation entre appareils.

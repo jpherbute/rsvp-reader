@@ -167,6 +167,38 @@ input[type="range"] { flex: 1; accent-color: var(--orp); height: 32px; margin: 0
 .nav { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 40rem; width: 100%; margin: 0 auto; }
 .info { flex: 1; text-align: center; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.35; min-width: 0; }
 
+/* ---------- liste des chapitres ---------- */
+#toc {
+  margin: 0 0 0 auto; padding: 0; border: 0; border-left: 1px solid var(--line);
+  width: min(26rem, 100vw); max-width: none; height: 100%; max-height: none; overflow: hidden;
+  background: var(--bg); color: var(--fg);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.18);
+}
+#toc[open] { display: flex; flex-direction: column; }
+#toc::backdrop { background: rgba(0, 0, 0, 0.35); }
+.toc-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 8px) 10px 8px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.toc-head h2 { margin: 0; font-family: var(--serif); font-size: 1.3rem; }
+.toc-list {
+  list-style: none; margin: 0; padding: 6px 0 calc(env(safe-area-inset-bottom) + 16px);
+  flex: 1; overflow-y: auto; overscroll-behavior: contain;
+}
+.toc-item {
+  width: 100%; display: flex; align-items: baseline; gap: 12px;
+  padding: 11px 18px 11px calc(15px + var(--depth, 0) * 16px);
+  border: 0; border-left: 3px solid transparent; background: transparent;
+  text-align: left; cursor: pointer;
+}
+.toc-item:hover { background: var(--panel); }
+.toc-item:focus-visible { outline: 2px solid var(--orp); outline-offset: -2px; }
+.toc-item .t { flex: 1; min-width: 0; font-family: var(--serif); font-size: 1.02rem; line-height: 1.3; }
+.toc-item .p { flex: none; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.toc-item.cur { border-left-color: var(--orp); background: var(--panel); }
+.toc-item.cur .t { font-weight: 700; }
+
 /* Pendant la lecture : plus rien à l'écran hormis le mot */
 .ui { transition: opacity 0.15s ease; }
 body.reading .ui { opacity: 0; pointer-events: none; }

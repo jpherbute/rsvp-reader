@@ -49,6 +49,7 @@
       <div id="rTitle" class="t"></div>
       <div id="rChapter" class="c"></div>
     </div>
+    <button class="icon" id="btnToc" aria-label="Chapitres" data-icon="list" hidden></button>
     <button class="icon" id="btnTheme" aria-label="Changer de thème"></button>
     <button class="icon" id="btnSize" aria-label="Taille du texte"><span class="aa">Aa</span></button>
   </header>
@@ -78,6 +79,14 @@
     </div>
   </footer>
 </main>
+
+<dialog id="toc" aria-labelledby="tocTitle">
+  <header class="toc-head">
+    <h2 id="tocTitle">Chapitres</h2>
+    <button class="icon" id="btnTocClose" aria-label="Fermer" data-icon="close"></button>
+  </header>
+  <ol id="tocList" class="toc-list"></ol>
+</dialog>
 
 <div id="toast" class="toast" role="status" hidden></div>
 
