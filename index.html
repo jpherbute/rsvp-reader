@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Éclair — lecture rapide</title>
+<meta name="description" content="Lecteur d'ebooks mot par mot (RSVP) : maintenez l'écran pour lire.">
+<meta name="theme-color" content="#f3efe4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Éclair">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ================= BIBLIOTHÈQUE ================= -->
+<main id="library" class="view">
+  <header class="lib-head">
+    <h1>Éclair</h1>
+    <div class="lib-actions">
+      <button class="icon" id="libTheme" aria-label="Changer de thème"></button>
+      <label class="btn primary" for="fileInput"><span data-icon="plus"></span>Importer</label>
+      <input id="fileInput" type="file" accept=".epub,.txt,.text,application/epub+zip,text/plain" multiple hidden>
+    </div>
+  </header>
+
+  <ul id="bookList" class="books"></ul>
+
+  <section id="empty" class="empty" hidden>
+    <p class="big">Votre bibliothèque est vide.</p>
+    <p>Importez un livre au format <b>EPUB</b> ou <b>TXT</b> (vous pouvez aussi le glisser-déposer sur la page).</p>
+    <p class="how">Dans le lecteur : <b>maintenez l'écran</b> (ou la barre d'espace) pour faire défiler le texte, relâchez pour mettre en pause.</p>
+    <button class="btn" id="btnSample">Essayer avec un texte d'exemple</button>
+  </section>
+
+  <div id="dropHint" class="drop" hidden>Déposez votre livre ici</div>
+</main>
+
+<!-- ================= LECTEUR ================= -->
+<main id="reader" class="view" hidden>
+  <div id="progress" class="ui" aria-label="Progression" role="progressbar"><i id="progressFill"></i></div>
+
+  <header class="bar top ui">
+    <button class="icon" id="btnHome" aria-label="Retour à la bibliothèque" data-icon="home"></button>
+    <div class="titles">
+      <div id="rTitle" class="t"></div>
+      <div id="rChapter" class="c"></div>
+    </div>
+    <button class="icon" id="btnTheme" aria-label="Changer de thème"></button>
+    <button class="icon" id="btnSize" aria-label="Taille du texte"><span class="aa">Aa</span></button>
+  </header>
+
+  <div id="stage">
+    <p id="hint" class="hint ui"></p>
+    <div class="rail" id="rail">
+      <span class="tick t"></span>
+      <div id="word"><span class="l"><span id="wl"></span></span><span class="c" id="wc"></span><span class="r"><span id="wr"></span></span></div>
+      <span class="tick b"></span>
+    </div>
+    <p id="context" class="context ui"></p>
+  </div>
+
+  <footer class="bar bottom ui">
+    <div class="speed">
+      <span class="lbl">Vitesse</span>
+      <input id="speed" type="range" min="100" max="1000" step="25" value="300" aria-label="Vitesse de lecture">
+      <output id="speedVal">300 mots/min</output>
+    </div>
+    <div class="nav">
+      <button class="icon sm" id="btnSentBack" aria-label="Phrase précédente" data-icon="dback"></button>
+      <button class="icon step" id="btnBack" aria-label="Mot précédent" data-icon="back"></button>
+      <div id="info" class="info"></div>
+      <button class="icon step" id="btnFwd" aria-label="Mot suivant" data-icon="fwd"></button>
+      <button class="icon sm" id="btnSentFwd" aria-label="Phrase suivante" data-icon="dfwd"></button>
+    </div>
+  </footer>
+</main>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
