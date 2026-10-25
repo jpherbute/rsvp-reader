@@ -6,6 +6,16 @@
 <title>Éclair — lecture rapide</title>
 <meta name="description" content="Lecteur d'ebooks mot par mot (RSVP) : maintenez l'écran pour lire.">
 <meta name="theme-color" content="#f3efe4">
+<script>
+  // Thème choisi appliqué avant le premier affichage : sinon la page démarre en clair et le téléphone
+  // peut garder une barre d'état claire au-dessus de l'app en thème sombre.
+  try {
+    if (JSON.parse(localStorage.getItem('eclair.theme')) === 'dark') {
+      document.documentElement.dataset.theme = 'dark';
+      document.querySelector('meta[name=theme-color]').content = '#12110d';
+    }
+  } catch (e) { /* stockage indisponible : thème clair */ }
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Éclair">
@@ -65,14 +75,21 @@
   <div id="progress" class="ui" aria-label="Progression" role="progressbar"><i id="progressFill"></i></div>
 
   <header class="bar top ui">
-    <button class="icon" id="btnHome" aria-label="Retour à la bibliothèque" data-icon="home"></button>
-    <div class="titles">
-      <div id="rTitle" class="t"></div>
-      <div id="rChapter" class="c"></div>
+    <div class="top-row">
+      <button class="icon" id="btnHome" aria-label="Retour à la bibliothèque" data-icon="home"></button>
+      <div class="titles">
+        <div id="rTitle" class="t"></div>
+        <div id="rChapter" class="c"></div>
+      </div>
+      <button class="icon" id="btnToc" aria-label="Chapitres" data-icon="list" hidden></button>
+      <button class="icon" id="btnTheme" aria-label="Changer de thème"></button>
+      <button class="icon" id="btnSettings" aria-label="Réglages" data-icon="sliders"></button>
     </div>
-    <button class="icon" id="btnToc" aria-label="Chapitres" data-icon="list" hidden></button>
-    <button class="icon" id="btnTheme" aria-label="Changer de thème"></button>
-    <button class="icon" id="btnSettings" aria-label="Réglages" data-icon="sliders"></button>
+    <div class="nav" id="chapRow" hidden>
+      <button class="icon sm" id="btnChapBack" aria-label="Chapitre précédent" data-icon="cback"></button>
+      <div id="chapInfo" class="info"></div>
+      <button class="icon sm" id="btnChapFwd" aria-label="Chapitre suivant" data-icon="cfwd"></button>
+    </div>
   </header>
 
   <div id="stage">
@@ -91,12 +108,7 @@
       <input id="speed" type="range" min="100" max="1000" step="25" value="300" aria-label="Vitesse de lecture">
       <output id="speedVal">300 mots/min</output>
     </div>
-    <div class="nav" id="chapRow" hidden>
-      <button class="icon sm" id="btnChapBack" aria-label="Chapitre précédent" data-icon="cback"></button>
-      <div id="chapInfo" class="info"></div>
-      <button class="icon sm" id="btnChapFwd" aria-label="Chapitre suivant" data-icon="cfwd"></button>
-    </div>
-    <div class="nav words">
+    <div class="nav">
       <button class="icon sm" id="btnSentBack" aria-label="Phrase précédente" data-icon="dback"></button>
       <button class="icon step" id="btnBack" aria-label="Mot précédent" data-icon="back"></button>
       <div id="info" class="info"></div>
