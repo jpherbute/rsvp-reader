@@ -1,4 +1,18 @@
 'use strict';
+// Si le démarrage échoue (par exemple avec des fichiers de deux versions différentes en cache),
+// on vide le cache de l'app et on recharge depuis le réseau, une seule fois par session.
+addEventListener('error', () => {
+  try {
+    if (window.__eclairReady || sessionStorage.getItem('eclair.recover')) return;
+    sessionStorage.setItem('eclair.recover', '1');
+  } catch { return; }
+  const reload = () => location.reload();
+  if (!('caches' in window)) { reload(); return; }
+  caches.keys()
+    .then((ks) => Promise.all(ks.filter((k) => k.startsWith('eclair-') && k !== 'eclair-shared').map((k) => caches.delete(k))))
+    .then(reload, reload);
+});
+
 (() => {
   const $ = (s) => document.querySelector(s);
   const fmt = (n) => n.toLocaleString('fr-FR');
@@ -22,6 +36,8 @@
     dfwd: '<path d="m5 6 6 6-6 6"/><path d="m12 6 6 6-6 6"/>',
     trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+    upload: '<path d="M12 20V9M7.5 13.5 12 9l4.5 4.5M5 4h14"/>',
     list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
     close: '<path d="m6 6 12 12M18 6 6 18"/>',
     cback: '<path d="M6.5 6v12"/><path d="m17.5 6-7 6 7 6"/>',
@@ -80,6 +96,7 @@
     };
     r.onerror = () => reject(r.error);
   });
+  const getAll = (store) => dbReq(store, 'readonly', (t) => t.objectStore(store).getAll());
   async function dbReq(stores, mode, fn) {
     const db = await dbp;
     return new Promise((resolve, reject) => {
@@ -375,6 +392,7 @@
     let ok = 0;
     for (const f of files) {
       try {
+        if (/\.zip$/i.test(f.name) || f.type === 'application/zip') { await restoreFile(f); continue; }
         toast(`Import de « ${f.name} »…`, true);
         let b;
         if (/\.epub$/i.test(f.name) || f.type === 'application/epub+zip') b = await parseEpub(f);
@@ -420,10 +438,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   }
 
   async function refreshLibrary() {
-    const [all, covers] = await Promise.all([
-      dbReq('books', 'readonly', (t) => t.objectStore('books').getAll()),
-      dbReq('covers', 'readonly', (t) => t.objectStore('covers').getAll()),
-    ]);
+    const [all, covers] = await Promise.all([getAll('books'), getAll('covers')]);
     const coverOf = new Map(covers.map((c) => [c.id, c.blob]));
     all.sort((a, b) => (b.openedAt || b.addedAt) - (a.openedAt || a.addedAt));
     const list = $('#bookList');
@@ -431,6 +446,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     coverUrls.forEach((u) => URL.revokeObjectURL(u));
     coverUrls = [];
     $('#empty').hidden = all.length > 0;
+    renderBackupNote(all.length);
     for (const b of all) {
       const li = document.createElement('li');
       const btn = document.createElement('button');
@@ -458,6 +474,101 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
       list.append(li);
     }
   }
+
+  /* ------------------------------------------------------------------ *
+   *  Sauvegarde / restauration : un .zip avec eclair.json (livres, positions),
+   *  textes/<id>.txt et couvertures/<id>.jpg
+   * ------------------------------------------------------------------ */
+  const ago = (t) => { const d = Math.floor((Date.now() - t) / 864e5); return d < 1 ? 'aujourd’hui' : d === 1 ? 'hier' : `il y a ${d} jours`; };
+  function renderBackupNote(n) {
+    const last = LS.get('lastBackup', 0);
+    $('#btnBackup').hidden = !n;
+    $('#backupNote').textContent = !n
+      ? 'Vous avez une sauvegarde d’Éclair ? Restaurez-la pour retrouver vos livres et vos positions de lecture.'
+      : `Vos livres ne sont enregistrés que sur cet appareil. ${last ? `Dernière sauvegarde : ${ago(last)}.` : 'Aucune sauvegarde pour l’instant.'}`;
+  }
+
+  async function backup() {
+    const books = await getAll('books');
+    if (!books.length) return;
+    toast('Préparation de la sauvegarde…', true);
+    const [keys, texts] = await dbReq('texts', 'readonly', (t) => { const st = t.objectStore('texts'); return [st.getAllKeys(), st.getAll()]; });
+    const zip = new JSZip();
+    zip.file('eclair.json', JSON.stringify({ app: 'eclair', version: 1, exportedAt: Date.now(), books }));
+    keys.result.forEach((id, i) => zip.file(`textes/${id}.txt`, texts.result[i]));
+    for (const c of await getAll('covers')) zip.file(`couvertures/${c.id}.jpg`, c.blob);
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `eclair-sauvegarde-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    LS.set('lastBackup', Date.now());
+    renderBackupNote(books.length);
+    toast(books.length > 1 ? `Sauvegarde enregistrée (${books.length} livres).` : 'Sauvegarde enregistrée (1 livre).');
+  }
+
+  // Ajoute les livres absents ; pour un livre déjà là (même identifiant, ou même titre, auteur et
+  // nombre de mots s'il a été importé à part), garde la position de la lecture la plus récente.
+  async function restore(file) {
+    const zip = await JSZip.loadAsync(file);
+    const man = zip.file('eclair.json');
+    const data = man && JSON.parse(await man.async('string'));
+    if (!data || data.app !== 'eclair' || !Array.isArray(data.books)) throw new Error('ce fichier n’est pas une sauvegarde d’Éclair.');
+    const existing = await getAll('books');
+    let added = 0, updated = 0;
+    for (const src of data.books) {
+      if (!src || typeof src.id !== 'string' || typeof src.title !== 'string' || !(src.words > 0)) continue;
+      const b = {
+        id: src.id, title: src.title, author: typeof src.author === 'string' ? src.author : '', words: src.words,
+        chapters: Array.isArray(src.chapters) ? src.chapters.filter((c) => c && typeof c.title === 'string' && Number.isInteger(c.w)) : [],
+        pos: Math.min(src.words - 1, Math.max(0, src.pos | 0)), addedAt: +src.addedAt || Date.now(), openedAt: +src.openedAt || 0,
+      };
+      const mine = existing.find((x) => x.id === b.id) || existing.find((x) => x.title === b.title && x.author === b.author && x.words === b.words);
+      if (mine) {
+        if (b.openedAt > (mine.openedAt || 0)) {
+          await dbReq('books', 'readwrite', (t) => t.objectStore('books').put({ ...mine, pos: b.pos, openedAt: b.openedAt }));
+          updated++;
+        }
+        continue;
+      }
+      const tf = zip.file(`textes/${b.id}.txt`);
+      if (!tf) continue;
+      const text = await tf.async('string');
+      const cf = zip.file(`couvertures/${b.id}.jpg`);
+      const cover = cf && new Blob([await cf.async('arraybuffer')], { type: 'image/jpeg' });
+      await dbReq(['books', 'texts', 'covers'], 'readwrite', (t) => {
+        t.objectStore('books').put(b);
+        t.objectStore('texts').put(text, b.id);
+        if (cover) t.objectStore('covers').put({ id: b.id, blob: cover });
+      });
+      existing.push(b);
+      added++;
+    }
+    return { added, updated };
+  }
+
+  async function restoreFile(f) {
+    try {
+      toast('Restauration de la sauvegarde…', true);
+      const { added, updated } = await restore(f);
+      const parts = [];
+      if (added) parts.push(added > 1 ? `${added} livres ajoutés` : '1 livre ajouté');
+      if (updated) parts.push(updated > 1 ? `${updated} positions mises à jour` : '1 position mise à jour');
+      toast(parts.length ? `Sauvegarde restaurée : ${parts.join(', ')}.` : 'Rien de nouveau dans cette sauvegarde.');
+    } catch (e) {
+      console.error(e);
+      toast(`${f.name} : ${e.message || 'sauvegarde illisible.'}`);
+    }
+    await refreshLibrary();
+  }
+
+  $('#btnBackup').addEventListener('click', () => backup().catch((e) => { console.error(e); toast('La sauvegarde a échoué.'); }));
+  $('#restoreInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (f) await restoreFile(f);
+  });
 
   $('#fileInput').addEventListener('change', async (e) => {
     const files = [...e.target.files];
@@ -844,10 +955,21 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   refreshLibrary().catch((e) => { console.error(e); toast('Stockage local indisponible.'); });
   importShared().catch((e) => { console.error(e); toast('Impossible d’importer le livre partagé.'); });
+  // Mises à jour : le service worker télécharge la nouvelle version en entier puis prévient la page
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('message', (e) => { if (e.data && e.data.type === 'update-ready') $('#update').hidden = false; });
+    // au retour sur l'app laissée ouverte, on lui demande de vérifier s'il y a du nouveau
+    document.addEventListener('visibilitychange', () => {
+      const sw = navigator.serviceWorker.controller;
+      if (!document.hidden && sw) sw.postMessage({ type: 'check' });
+    });
   }
+  $('#btnUpdate').addEventListener('click', () => location.reload());
+  $('#btnUpdateLater').addEventListener('click', () => { $('#update').hidden = true; });
 
   // exposé pour les tests
   window.__eclair = { tokenize, splitWord, S };
+  window.__eclairReady = true;
+  try { sessionStorage.removeItem('eclair.recover'); } catch { /* ignore */ }
 })();
