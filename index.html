@@ -51,7 +51,7 @@
     </div>
     <button class="icon" id="btnToc" aria-label="Chapitres" data-icon="list" hidden></button>
     <button class="icon" id="btnTheme" aria-label="Changer de thème"></button>
-    <button class="icon" id="btnSize" aria-label="Taille du texte"><span class="aa">Aa</span></button>
+    <button class="icon" id="btnSettings" aria-label="Réglages" data-icon="sliders"></button>
   </header>
 
   <div id="stage">
@@ -70,7 +70,12 @@
       <input id="speed" type="range" min="100" max="1000" step="25" value="300" aria-label="Vitesse de lecture">
       <output id="speedVal">300 mots/min</output>
     </div>
-    <div class="nav">
+    <div class="nav" id="chapRow" hidden>
+      <button class="icon sm" id="btnChapBack" aria-label="Chapitre précédent" data-icon="cback"></button>
+      <div id="chapInfo" class="info"></div>
+      <button class="icon sm" id="btnChapFwd" aria-label="Chapitre suivant" data-icon="cfwd"></button>
+    </div>
+    <div class="nav words">
       <button class="icon sm" id="btnSentBack" aria-label="Phrase précédente" data-icon="dback"></button>
       <button class="icon step" id="btnBack" aria-label="Mot précédent" data-icon="back"></button>
       <div id="info" class="info"></div>
@@ -86,6 +91,33 @@
     <button class="icon" id="btnTocClose" aria-label="Fermer" data-icon="close"></button>
   </header>
   <ol id="tocList" class="toc-list"></ol>
+</dialog>
+
+<dialog id="settings" aria-labelledby="setTitle">
+  <header class="toc-head">
+    <h2 id="setTitle">Réglages</h2>
+    <button class="icon" id="btnSetClose" aria-label="Fermer" data-icon="close"></button>
+  </header>
+  <div class="set-body">
+    <fieldset>
+      <legend>Lecture</legend>
+      <div class="seg">
+        <label><input type="radio" name="mode" value="hold"><span>Maintenir</span></label>
+        <label><input type="radio" name="mode" value="tap"><span>Toucher</span></label>
+      </div>
+      <p class="note" id="modeNote"></p>
+      <label class="check"><input type="checkbox" id="rewind"><span>Après une pause, reprendre quelques mots plus tôt</span></label>
+    </fieldset>
+    <fieldset>
+      <legend>Taille du texte</legend>
+      <div class="seg">
+        <label><input type="radio" name="size" value="0"><span class="aa" style="font-size: 0.85rem">Aa</span></label>
+        <label><input type="radio" name="size" value="1"><span class="aa" style="font-size: 1.05rem">Aa</span></label>
+        <label><input type="radio" name="size" value="2"><span class="aa" style="font-size: 1.3rem">Aa</span></label>
+        <label><input type="radio" name="size" value="3"><span class="aa" style="font-size: 1.6rem">Aa</span></label>
+      </div>
+    </fieldset>
+  </div>
 </dialog>
 
 <div id="toast" class="toast" role="status" hidden></div>
