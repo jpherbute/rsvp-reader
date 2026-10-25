@@ -51,6 +51,7 @@ button { font: inherit; color: inherit; }
 .icon:hover { background: var(--panel); }
 .icon:focus-visible, .btn:focus-visible, .book:focus-visible { outline: 2px solid var(--orp); outline-offset: 2px; }
 .icon.sm { color: var(--muted); }
+.icon:disabled { opacity: 0.3; cursor: default; background: transparent; }
 .icon.step { width: 56px; height: 52px; background: var(--panel); border-radius: 14px; }
 .icon.step:active { background: var(--line); }
 .icon svg { display: block; }
@@ -138,6 +139,8 @@ button { font: inherit; color: inherit; }
   font-family: var(--serif); font-size: 1.02rem; line-height: 1.55; color: var(--muted);
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+.context span { cursor: pointer; }
+.context span:hover { color: var(--fg); }
 .context .cur { color: var(--fg); font-weight: 700; }
 
 #progress {
@@ -166,6 +169,16 @@ button { font: inherit; color: inherit; }
 input[type="range"] { flex: 1; accent-color: var(--orp); height: 32px; margin: 0; min-width: 0; }
 .nav { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 40rem; width: 100%; margin: 0 auto; }
 .info { flex: 1; text-align: center; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.35; min-width: 0; }
+/* Petit écran (iPhone SE…) : contexte plus près du mot et barre du bas plus serrée */
+@media (max-height: 700px) {
+  .context { margin-top: 1rem; }
+  .bar.bottom { gap: 6px; }
+}
+/* Écran large mais bas (téléphone à l'horizontale) : vitesse et chapitre côte à côte, pour ne pas masquer le mot */
+@media (max-height: 520px) and (min-width: 600px) {
+  .bar.bottom:has(#chapRow:not([hidden])) { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .bar.bottom .words { grid-column: 1 / -1; }
+}
 
 /* ---------- liste des chapitres ---------- */
 #toc {
@@ -198,6 +211,32 @@ input[type="range"] { flex: 1; accent-color: var(--orp); height: 32px; margin: 0
 .toc-item .p { flex: none; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .toc-item.cur { border-left-color: var(--orp); background: var(--panel); }
 .toc-item.cur .t { font-weight: 700; }
+
+/* ---------- réglages (panneau en bas : le mot reste visible au-dessus) ---------- */
+#settings {
+  margin: auto auto 0; padding: 0; border: 0; border-top: 1px solid var(--line);
+  width: min(32rem, 100vw); max-width: none; max-height: 90%;
+  border-radius: 18px 18px 0 0; background: var(--bg); color: var(--fg);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.18);
+}
+#settings::backdrop { background: rgba(0, 0, 0, 0.15); }
+#settings .toc-head { padding-top: 8px; }
+.set-body { padding: 0 18px calc(env(safe-area-inset-bottom) + 20px); }
+.set-body fieldset { border: 0; margin: 16px 0 0; padding: 0; min-width: 0; }
+.set-body fieldset + fieldset { margin-top: 22px; }
+.set-body legend { padding: 0; margin-bottom: 8px; font-size: 0.82rem; color: var(--muted); }
+.seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--panel); }
+.seg label { flex: 1; position: relative; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span {
+  display: grid; place-items: center; min-height: 40px; padding: 0 10px; border-radius: 9px;
+  cursor: pointer; font-size: 0.95rem;
+}
+.seg input:checked + span { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.seg input:focus-visible + span { outline: 2px solid var(--orp); outline-offset: 1px; }
+.note { margin: 8px 2px 0; font-size: 0.85rem; line-height: 1.45; color: var(--muted); }
+.check { display: flex; align-items: center; gap: 10px; margin-top: 14px; cursor: pointer; font-size: 0.95rem; }
+.check input { width: 20px; height: 20px; margin: 0; accent-color: var(--orp); flex: none; }
 
 /* Pendant la lecture : plus rien à l'écran hormis le mot */
 .ui { transition: opacity 0.15s ease; }

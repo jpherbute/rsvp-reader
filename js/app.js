@@ -24,6 +24,9 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
     close: '<path d="m6 6 12 12M18 6 6 18"/>',
+    cback: '<path d="M6.5 6v12"/><path d="m17.5 6-7 6 7 6"/>',
+    cfwd: '<path d="M17.5 6v12"/><path d="m6.5 6 7 6-7 6"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   };
   const svg = (name) =>
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -46,7 +49,6 @@
   let sizeIdx = Math.min(SIZES.length - 1, Math.max(0, LS.get('size', 1)));
   const applySize = () => { root.style.setProperty('--scale', SIZES[sizeIdx]); LS.set('size', sizeIdx); };
   applySize();
-  $('#btnSize').addEventListener('click', () => { sizeIdx = (sizeIdx + 1) % SIZES.length; applySize(); renderWord(); });
 
   let toastTimer;
   function toast(msg, sticky) {
@@ -406,6 +408,12 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   let reading = false;
   let raf = 0, nextAt = 0, ramp = 0, saveTimer = 0;
   const RAMP = 8;
+  let tapMode = LS.get('mode', 'hold') === 'tap';   // toucher pour lancer / arrêter au lieu de maintenir
+  let rewindOn = LS.get('rewind', true);
+  // Reprise : on revient d'au plus REWIND mots, sans remonter avant le début de la phrase,
+  // après une pause d'au moins 1,5 s survenue en lisant (pas après un déplacement volontaire)
+  const REWIND = 4;
+  let pausedAt = 0, canRewind = false;
 
   const elL = $('#wl'), elC = $('#wc'), elR = $('#wr'), elWord = $('#word'), elRail = $('#rail');
 
@@ -446,6 +454,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     const h = Math.floor(min / 60);
     return `${h} h ${String(Math.round(min % 60)).padStart(2, '0')}`;
   }
+  const approx = (min) => (min < 1 ? '< 1 min' : '≈ ' + fmtTime(min));
   function chapterIdx(i) {
     const ch = S.book && S.book.chapters;
     if (!ch || !ch.length) return -1;
@@ -462,12 +471,23 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     for (let j = from; j < to; j++) {
       const s = document.createElement('span');
       if (j === S.idx) s.className = 'cur';
+      s.dataset.i = j;
       s.textContent = S.words[j] + (j < to - 1 ? ' ' : '');
       ctx.append(s);
     }
     $('#rChapter').textContent = chapterAt(S.idx);
-    $('#info').textContent = `${fmt(S.idx + 1)} / ${fmt(n)} · ≈ ${fmtTime((n - S.idx - 1) / wpm)}`;
-    $('#hint').textContent = S.idx >= n - 1 ? 'Fin du livre' : 'Maintenez l’écran ou la barre d’espace pour lire';
+    $('#info').textContent = `${fmt(S.idx + 1)} / ${fmt(n)} · ${approx((n - S.idx - 1) / wpm)}`;
+    const ch = (S.book && S.book.chapters) || [];
+    if (ch.length) {
+      const k = chapterIdx(S.idx), last = k + 1 >= ch.length;
+      const left = approx(((last ? n : ch[k + 1].w) - S.idx) / wpm);
+      $('#chapInfo').textContent = k < 0 ? `Premier chapitre dans ${left}` : last ? `Fin du livre dans ${left}` : `Fin du chapitre dans ${left}`;
+      $('#btnChapBack').disabled = S.idx === 0;
+      $('#btnChapFwd').disabled = last;
+    }
+    $('#hint').textContent = S.idx >= n - 1 ? 'Fin du livre'
+      : tapMode ? 'Touchez l’écran ou appuyez sur Espace pour lire ou faire une pause'
+        : 'Maintenez l’écran ou la barre d’espace pour lire';
     $('#speedVal').textContent = `${wpm} mots/min`;
     $('#speed').value = wpm;
   }
@@ -493,6 +513,11 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   function start() {
     if (reading || !S.words.length || S.idx >= S.words.length - 1) return;
+    if (rewindOn && canRewind && performance.now() - pausedAt >= 1500) {
+      for (let k = 0; k < REWIND && !isStart(S.idx); k++) S.idx--;
+      renderWord();
+    }
+    canRewind = false;
     reading = true; ramp = 0;
     document.body.classList.add('reading');
     nextAt = performance.now() + delayFor(S.idx) * rampFactor(0);
@@ -503,6 +528,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   function stop() {
     if (!reading) return;
     reading = false;
+    pausedAt = performance.now(); canRewind = true;
     cancelAnimationFrame(raf);
     clearInterval(saveTimer);
     document.body.classList.remove('reading');
@@ -521,6 +547,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   function go(i) {
     if (reading) return;
+    canRewind = false;
     S.idx = Math.min(S.words.length - 1, Math.max(0, i));
     renderWord(); renderPause();
   }
@@ -535,6 +562,16 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     go(j);
   }
 
+  function chapter(dir) {
+    const ch = (S.book && S.book.chapters) || [];
+    if (!ch.length) return;
+    const k = chapterIdx(S.idx);
+    if (dir > 0) { if (k + 1 < ch.length) go(ch[k + 1].w); }
+    else if (k >= 0 && ch[k].w < S.idx) go(ch[k].w);   // d'abord le début du chapitre en cours
+    else { let j = k - 1; while (j >= 0 && ch[j].w >= S.idx) j--; go(j >= 0 ? ch[j].w : 0); }
+    savePos();
+  }
+
   async function openBook(id) {
     const meta = await dbReq('books', 'readonly', (t) => t.objectStore('books').get(id));
     const text = await dbReq('texts', 'readonly', (t) => t.objectStore('texts').get(id));
@@ -543,7 +580,8 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     S.book = meta; S.words = tk.words; S.paraEnd = tk.paraEnd;
     S.idx = Math.min(meta.pos || 0, Math.max(0, S.words.length - 1));
     $('#rTitle').textContent = meta.title;
-    $('#btnToc').hidden = !(meta.chapters && meta.chapters.length);
+    $('#btnToc').hidden = $('#chapRow').hidden = !(meta.chapters && meta.chapters.length);
+    pausedAt = 0; canRewind = true;
     $('#library').hidden = true;
     $('#reader').hidden = false;
     history.pushState({ reader: 1 }, '');
@@ -554,7 +592,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   function showLibrary() {
     stop();
-    if (tocDlg.open) tocDlg.close();
+    for (const d of [tocDlg, setDlg]) if (d.open) d.close();
     if (S.book) savePos();
     S.book = null; S.words = [];
     $('#reader').hidden = true;
@@ -593,12 +631,36 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   $('#btnTocClose').addEventListener('click', () => tocDlg.close());
   tocDlg.addEventListener('click', (e) => { if (e.target === tocDlg) tocDlg.close(); });
 
-  /* --- Appui maintenu = lecture ; relâchement = pause --- */
+  /* --- Réglages --- */
+  const setDlg = $('#settings');
+  function syncSettings() {
+    setDlg.querySelector(`input[name=mode][value=${tapMode ? 'tap' : 'hold'}]`).checked = true;
+    setDlg.querySelector(`input[name=size][value="${sizeIdx}"]`).checked = true;
+    $('#rewind').checked = rewindOn;
+    $('#modeNote').textContent = tapMode
+      ? 'Touchez l’écran (ou Espace) pour lancer la lecture, puis à nouveau pour la mettre en pause.'
+      : 'Le texte défile tant que vous maintenez l’écran (ou la barre d’espace).';
+  }
+  $('#btnSettings').addEventListener('click', () => { if (reading) return; syncSettings(); setDlg.showModal(); });
+  $('#btnSetClose').addEventListener('click', () => setDlg.close());
+  setDlg.addEventListener('click', (e) => { if (e.target === setDlg) setDlg.close(); });
+  setDlg.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.name === 'mode') { tapMode = t.value === 'tap'; LS.set('mode', t.value); }
+    else if (t.name === 'size') { sizeIdx = +t.value; applySize(); renderWord(); }
+    else if (t.id === 'rewind') { rewindOn = t.checked; LS.set('rewind', rewindOn); }
+    syncSettings();
+    if (S.words.length) renderPause();
+  });
+
+  /* --- Lecture : appui maintenu (relâcher = pause), ou toucher pour lancer / arrêter --- */
   const stage = $('#stage');
   let activePointer = null;
   stage.addEventListener('pointerdown', (e) => {
-    if (e.button > 0 || activePointer !== null) return;
+    if (e.button > 0) return;
     e.preventDefault();
+    if (tapMode) { if (e.isPrimary) { if (reading) stop(); else start(); } return; }
+    if (activePointer !== null) return;
     activePointer = e.pointerId;
     try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     start();
@@ -609,17 +671,28 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   stage.addEventListener('lostpointercapture', release);
   $('#reader').addEventListener('contextmenu', (e) => e.preventDefault());
 
+  // En pause, toucher un mot du contexte y place la lecture (sans lancer la lecture)
+  const ctxEl = $('#context');
+  ctxEl.addEventListener('pointerdown', (e) => { if (!reading && e.target.dataset.i) e.stopPropagation(); });
+  ctxEl.addEventListener('click', (e) => { const i = e.target.dataset.i; if (!reading && i) { go(+i); savePos(); } });
+
   /* --- Clavier --- */
   let spaceDown = false;
   addEventListener('keydown', (e) => {
-    if ($('#reader').hidden || tocDlg.open) return;
+    if ($('#reader').hidden || tocDlg.open || setDlg.open) return;
     switch (e.code) {
-      case 'Space': e.preventDefault(); if (!e.repeat && !spaceDown) { spaceDown = true; start(); } break;
+      case 'Space':
+        e.preventDefault();
+        if (e.repeat) break;
+        if (tapMode) { if (reading) stop(); else start(); } else if (!spaceDown) { spaceDown = true; start(); }
+        break;
       case 'ArrowLeft': e.preventDefault(); step(e.shiftKey ? -10 : -1); break;
       case 'ArrowRight': e.preventDefault(); step(e.shiftKey ? 10 : 1); break;
       case 'ArrowUp': e.preventDefault(); setWpm(wpm + 25); break;
       case 'ArrowDown': e.preventDefault(); setWpm(wpm - 25); break;
-      case 'Escape': if (!reading) $('#btnHome').click(); break;
+      case 'PageUp': e.preventDefault(); chapter(-1); break;
+      case 'PageDown': e.preventDefault(); chapter(1); break;
+      case 'Escape': if (reading) stop(); else $('#btnHome').click(); break;
       default:
     }
   });
@@ -658,6 +731,8 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   holdRepeat($('#btnFwd'), () => step(1));
   $('#btnSentBack').addEventListener('click', () => { sentence(-1); savePos(); });
   $('#btnSentFwd').addEventListener('click', () => { sentence(1); savePos(); });
+  $('#btnChapBack').addEventListener('click', () => chapter(-1));
+  $('#btnChapFwd').addEventListener('click', () => chapter(1));
 
   /* --- Barre de progression (déplaçable en pause) --- */
   const prog = $('#progress');

@@ -6,15 +6,20 @@ alignée sur un axe fixe (technique RSVP).
 ## Utilisation
 
 - **Maintenez l'écran** (ou la **barre d'espace**) : le texte défile. **Relâchez** : pause.
+  Dans les réglages, le mode **Toucher** permet de lancer d'un toucher et d'arrêter d'un autre.
+- Après une pause de plus d'une seconde et demie, la lecture reprend jusqu'à 4 mots plus tôt, sans remonter
+  avant le début de la phrase (désactivable dans les réglages).
 - Pendant la lecture, rien d'autre que le mot n'est affiché. En pause : progression globale (en haut,
   déplaçable), titre/chapitre, contexte, vitesse, navigation.
-- Pas à pas : boutons ‹ › (appui long = répétition), `«` `»` = phrase précédente/suivante.
-  Clavier : `←` `→` (±1 mot, `Maj` = ±10), `↑` `↓` (vitesse), `Échap` (bibliothèque).
-- Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre. Ils viennent de la table
-  des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT, les lignes du type « CHAPITRE IV. », « Livre premier »…
+- Pas à pas : boutons ‹ › (appui long = répétition), `«` `»` = phrase précédente/suivante ; toucher un mot du
+  contexte s'y place. Clavier : `←` `→` (±1 mot, `Maj` = ±10), `↑` `↓` (vitesse), `Page↑` `Page↓` (chapitre),
+  `Échap` (pause, puis bibliothèque).
+- Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre, boutons ⏮ ⏭ en bas avec le
+  temps restant dans le chapitre. Ils viennent de la table des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT,
+  les lignes du type « CHAPITRE IV. », « Livre premier »…
 - Vitesse : 100 à 1000 mots/min. Le rythme s'adapte : mots longs, virgules, fins de phrase et de paragraphe,
   et une courte accélération progressive à chaque reprise.
-- Thème clair (par défaut) / sombre, taille du texte (`Aa`).
+- Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.
 
