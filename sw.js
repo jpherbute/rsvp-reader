@@ -29,10 +29,11 @@ function same(a, b) {
 // Télécharge tous les fichiers de l'app ; s'ils diffèrent du cache courant, les enregistre
 // dans un nouveau cache complet. Renvoie true si une nouvelle version remplace une ancienne.
 // Au plus une vérification toutes les 10 s (lancement = navigation + retour sur l'app), sauf s'il n'y a
-// pas encore de cache complet.
+// pas encore de cache complet. Une vérification demandée pendant une autre attend sa fin puis repart si
+// besoin (par exemple si la page a vidé le cache entre-temps pour se réparer).
 let checking = null, lastCheck = 0;
 function refresh(force) {
-  if (checking) return checking;
+  if (checking) return checking.then(() => refresh(force), () => refresh(force));
   checking = (async () => {
     const cur = await current();
     if (cur && !force && Date.now() - lastCheck < 10000) return false;
