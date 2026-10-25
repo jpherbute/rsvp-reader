@@ -80,8 +80,20 @@ button { font: inherit; color: inherit; }
 .book {
   width: 100%; text-align: left; cursor: pointer;
   background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-  padding: 16px 56px 14px 16px; display: grid; gap: 4px;
+  padding: 12px 56px 12px 12px; display: flex; align-items: center; gap: 14px;
 }
+.book .txt { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.cover {
+  flex: none; width: 52px; height: 78px; border-radius: 4px; object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+/* sans couverture : initiale du titre sur une teinte tirée du titre (--h) */
+.cover.ph {
+  display: grid; place-items: center;
+  font-family: var(--serif); font-size: 1.6rem; font-weight: 600;
+  color: hsl(var(--h) 28% 34%); background: hsl(var(--h) 30% 85%);
+}
+:root[data-theme="dark"] .cover.ph { color: hsl(var(--h) 25% 72%); background: hsl(var(--h) 16% 22%); }
 .book .t { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; line-height: 1.25; }
 .book .a { color: var(--muted); font-size: 0.9rem; }
 .book .m { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
