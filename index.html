@@ -36,6 +36,15 @@
     <button class="btn" id="btnSample">Essayer avec un texte d'exemple</button>
   </section>
 
+  <section class="backup" aria-label="Sauvegarde">
+    <p class="note" id="backupNote"></p>
+    <div class="backup-actions">
+      <button class="btn" id="btnBackup" hidden><span data-icon="download"></span>Sauvegarder</button>
+      <label class="btn" for="restoreInput"><span data-icon="upload"></span>Restaurer</label>
+      <input id="restoreInput" type="file" accept=".zip,application/zip" hidden>
+    </div>
+  </section>
+
   <div id="dropHint" class="drop" hidden>Déposez votre livre ici</div>
 </main>
 
@@ -121,6 +130,11 @@
 </dialog>
 
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="update" class="update" role="status" hidden>
+  <span>Nouvelle version disponible</span>
+  <button class="btn primary" id="btnUpdate">Recharger</button>
+  <button class="icon" id="btnUpdateLater" aria-label="Plus tard" data-icon="close"></button>
+</div>
 
 <script src="vendor/jszip.min.js"></script>
 <script src="js/app.js"></script>

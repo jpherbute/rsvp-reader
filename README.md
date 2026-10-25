@@ -23,6 +23,12 @@ alignée sur un axe fixe (technique RSVP).
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.
 - Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre.
+- **Sauvegarde** (en bas de la bibliothèque) : *Sauvegarder* télécharge un `.zip` avec les livres, leurs
+  couvertures et les positions de lecture ; *Restaurer* (ou *Importer* ce fichier) ajoute les livres absents et,
+  pour un livre déjà présent, garde la lecture la plus récente. Utile avant une réinstallation ou pour passer
+  sur un autre appareil.
+- **Mises à jour** : quand une nouvelle version est publiée, l'app la télécharge en entier en arrière-plan puis
+  affiche « Nouvelle version disponible — Recharger ».
 - **Partage vers l'app** (Android, application installée) : « Partager → Éclair » depuis un gestionnaire de
   fichiers ou un téléchargement importe le livre. Non disponible sur iPhone/iPad, où Safari ne permet pas aux
   applications web de recevoir un partage.
@@ -48,7 +54,7 @@ l'application fonctionne donc sous `https://<utilisateur>.github.io/rsvp-reader/
 index.html            bibliothèque + lecteur
 css/app.css           thèmes clair/sombre, mise en page
 js/app.js             import EPUB/TXT, moteur RSVP, bibliothèque
-sw.js                 cache hors ligne
+sw.js                 hors ligne, mises à jour d'un bloc, réception des partages
 manifest.webmanifest  installation PWA
 vendor/jszip.min.js   lecture des EPUB (JSZip, MIT)
 ```
