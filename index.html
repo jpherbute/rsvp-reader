@@ -132,24 +132,32 @@
     <button class="icon" id="btnSetClose" aria-label="Fermer" data-icon="close"></button>
   </header>
   <div class="set-body">
-    <fieldset>
-      <legend>Lecture</legend>
+    <div class="set-row" role="radiogroup" aria-labelledby="lblMode">
+      <span class="lbl" id="lblMode">Lecture</span>
       <div class="seg">
         <label><input type="radio" name="mode" value="hold"><span>Maintenir</span></label>
         <label><input type="radio" name="mode" value="tap"><span>Toucher</span></label>
       </div>
       <p class="note" id="modeNote"></p>
-      <label class="check"><input type="checkbox" id="rewind"><span>Après une pause, reprendre quelques mots plus tôt</span></label>
-    </fieldset>
-    <fieldset>
-      <legend>Taille du texte</legend>
+    </div>
+    <div class="set-row" role="radiogroup" aria-labelledby="lblRhythm">
+      <span class="lbl" id="lblRhythm">Rythme</span>
+      <div class="seg">
+        <label><input type="radio" name="rhythm" value="regular"><span>Régulier</span></label>
+        <label><input type="radio" name="rhythm" value="natural"><span>Naturel</span></label>
+      </div>
+      <p class="note" id="rhythmNote"></p>
+    </div>
+    <div class="set-row" role="radiogroup" aria-labelledby="lblSize">
+      <span class="lbl" id="lblSize">Taille</span>
       <div class="seg">
         <label><input type="radio" name="size" value="0"><span class="aa" style="font-size: 0.85rem">Aa</span></label>
         <label><input type="radio" name="size" value="1"><span class="aa" style="font-size: 1.05rem">Aa</span></label>
         <label><input type="radio" name="size" value="2"><span class="aa" style="font-size: 1.3rem">Aa</span></label>
         <label><input type="radio" name="size" value="3"><span class="aa" style="font-size: 1.6rem">Aa</span></label>
       </div>
-    </fieldset>
+    </div>
+    <label class="check"><input type="checkbox" id="rewind"><span>Après une pause, revenir de quelques mots</span></label>
   </div>
 </dialog>
 
