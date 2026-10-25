@@ -54,3 +54,38 @@ test('partage vers l’app : le service worker reçoit les fichiers, l’app les
   await expect(page.locator('.book')).toHaveCount(2);              // pas réimporté au lancement suivant
   expect((await dbBooks(page)).map((b) => b.title)).toEqual(['chapitres', 'Roman d’essai']);
 });
+
+test('recherche (sans accents ni majuscules, plusieurs mots) et tri mémorisé', async ({ page }) => {
+  await page.goto('/');
+  await importBooks(page, ['roman.epub', 'ncx.epub', 'notoc.epub']);
+  await expect(page.locator('#libTools')).toBeHidden();             // pas utile pour 3 livres
+  await importBooks(page, ['cover-byname.epub', 'cover-broken.epub', 'chapitres.txt']);
+  await expect(page.locator('#libTools')).toBeVisible();
+  const visible = () => page.locator('.books li:not([hidden]) .book .t').allTextContents();
+
+  await page.fill('#search', 'CASSEE');
+  expect(await visible()).toEqual(['Couverture cassée']);
+  await page.fill('#search', 'auteur ncx');                         // tous les mots, titre ou auteur
+  expect(await visible()).toEqual(['Livre NCX']);
+  await page.fill('#search', 'essai');
+  expect(await visible()).toEqual(['Roman d’essai']);
+  await page.fill('#search', 'introuvable');
+  expect(await visible()).toEqual([]);
+  await expect(page.locator('#noMatch')).toHaveText('Aucun livre ne correspond à « introuvable ».');
+  await page.fill('#search', '');
+  expect(await visible()).toHaveLength(6);
+  await expect(page.locator('#noMatch')).toBeHidden();
+
+  await page.selectOption('#sort', 'title');
+  await expect(page.locator('.book .t')).toHaveText(['chapitres', 'Couverture cassée', 'Couverture par nom', 'Livre NCX', 'Roman d’essai', 'Sans sommaire']);
+  await page.selectOption('#sort', 'author');                       // livres avec auteur d'abord
+  await expect(page.locator('.book .t')).toHaveText(['Roman d’essai', 'Livre NCX', 'chapitres', 'Couverture cassée', 'Couverture par nom', 'Sans sommaire']);
+  await page.locator('.book', { hasText: 'Sans sommaire' }).click();
+  await page.click('#btnChapFwd');
+  await page.click('#btnHome');
+  await page.selectOption('#sort', 'progress');
+  await expect(page.locator('.book .t').first()).toHaveText('Sans sommaire');
+  await page.reload();
+  await expect(page.locator('#sort')).toHaveValue('progress');
+  await expect(page.locator('.book .t').first()).toHaveText('Sans sommaire');
+});

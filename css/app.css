@@ -75,6 +75,14 @@ button { font: inherit; color: inherit; }
 }
 .lib-head h1 { margin: 0; font-family: var(--serif); font-size: 2rem; letter-spacing: -0.01em; }
 .lib-actions { display: flex; align-items: center; gap: 8px; }
+.lib-tools { max-width: 44rem; margin: 0 auto 12px; display: flex; gap: 8px; }
+.lib-tools input, .lib-tools select {
+  font: inherit; font-size: 0.95rem; color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; height: 42px; padding: 0 12px; min-width: 0;
+}
+.lib-tools input { flex: 1; }
+.lib-tools input:focus-visible, .lib-tools select:focus-visible { outline: 2px solid var(--orp); outline-offset: 1px; }
+.nomatch { max-width: 44rem; margin: 24px auto; text-align: center; color: var(--muted); }
 .books { list-style: none; margin: 0 auto; padding: 0; max-width: 44rem; display: grid; gap: 12px; }
 .books li { position: relative; }
 .book {

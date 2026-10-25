@@ -437,10 +437,35 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     return ph;
   }
 
+  // Tri (mémorisé) et recherche dans le titre et l'auteur, sans tenir compte des accents ni des majuscules
+  const norm = (s) => (s || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const progress = (b) => (b.words > 1 ? b.pos / (b.words - 1) : 0);
+  const byTitle = (a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base', numeric: true });
+  const SORTS = {
+    recent: (a, b) => (b.openedAt || b.addedAt) - (a.openedAt || a.addedAt),
+    title: byTitle,
+    author: (a, b) => (!a.author - !b.author) || (a.author || '').localeCompare(b.author || '', 'fr', { sensitivity: 'base' }) || byTitle(a, b),
+    progress: (a, b) => progress(b) - progress(a) || byTitle(a, b),
+  };
+  let sortBy = SORTS[LS.get('sort', 'recent')] ? LS.get('sort', 'recent') : 'recent';
+
+  function applySearch() {
+    const raw = $('#search').value.trim(), words = norm(raw).split(/\s+/).filter(Boolean);
+    let shown = 0;
+    for (const li of $('#bookList').children) {
+      li.hidden = !words.every((w) => li.dataset.q.includes(w));
+      if (!li.hidden) shown++;
+    }
+    $('#noMatch').hidden = !words.length || shown > 0;
+    $('#noMatch').textContent = `Aucun livre ne correspond à « ${raw} ».`;
+  }
+
   async function refreshLibrary() {
     const [all, covers] = await Promise.all([getAll('books'), getAll('covers')]);
     const coverOf = new Map(covers.map((c) => [c.id, c.blob]));
-    all.sort((a, b) => (b.openedAt || b.addedAt) - (a.openedAt || a.addedAt));
+    all.sort(SORTS[sortBy]);
+    $('#libTools').hidden = all.length < 4;           // utile seulement quand la liste s'allonge
+    if ($('#libTools').hidden) $('#search').value = '';
     const list = $('#bookList');
     list.replaceChildren();
     coverUrls.forEach((u) => URL.revokeObjectURL(u));
@@ -449,6 +474,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     renderBackupNote(all.length);
     for (const b of all) {
       const li = document.createElement('li');
+      li.dataset.q = norm(`${b.title} ${b.author || ''}`);
       const btn = document.createElement('button');
       btn.className = 'book';
       const pct = b.words > 1 ? Math.round((b.pos / (b.words - 1)) * 100) : 0;
@@ -473,7 +499,11 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
       li.append(btn, del);
       list.append(li);
     }
+    applySearch();
   }
+  $('#search').addEventListener('input', applySearch);
+  $('#sort').value = sortBy;
+  $('#sort').addEventListener('change', (e) => { sortBy = e.target.value; LS.set('sort', sortBy); refreshLibrary(); });
 
   /* ------------------------------------------------------------------ *
    *  Sauvegarde / restauration : un .zip avec eclair.json (livres, positions),

@@ -27,7 +27,18 @@
     </div>
   </header>
 
+  <div class="lib-tools" id="libTools" hidden>
+    <input type="search" id="search" placeholder="Rechercher un titre, un auteur" aria-label="Rechercher dans la bibliothèque" autocomplete="off">
+    <select id="sort" aria-label="Trier la bibliothèque">
+      <option value="recent">Récents</option>
+      <option value="title">Titre</option>
+      <option value="author">Auteur</option>
+      <option value="progress">Progression</option>
+    </select>
+  </div>
+
   <ul id="bookList" class="books"></ul>
+  <p id="noMatch" class="nomatch" hidden></p>
 
   <section id="empty" class="empty" hidden>
     <p class="big">Votre bibliothèque est vide.</p>

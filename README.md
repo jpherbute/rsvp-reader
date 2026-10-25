@@ -22,7 +22,9 @@ alignée sur un axe fixe (technique RSVP).
 - Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.
-- Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre.
+- Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre. À partir de 4 livres :
+  recherche dans les titres et les auteurs (sans tenir compte des accents) et tri (récents, titre, auteur,
+  progression).
 - **Sauvegarde** (en bas de la bibliothèque) : *Sauvegarder* télécharge un `.zip` avec les livres, leurs
   couvertures et les positions de lecture ; *Restaurer* (ou *Importer* ce fichier) ajoute les livres absents et,
   pour un livre déjà présent, garde la lecture la plus récente. Utile avant une réinstallation ou pour passer
