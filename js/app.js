@@ -739,6 +739,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   let raf = 0, nextAt = 0, ramp = 0, saveTimer = 0;
   const RAMP = 8;
   let tapMode = LS.get('mode', 'hold') === 'tap';   // toucher pour lancer / arrêter au lieu de maintenir
+  let rhythm = LS.get('rhythm', 'regular') === 'natural' ? 'natural' : 'regular';   // durée des mots longs
   let rewindOn = LS.get('rewind', true);
   // Reprise : on revient d'au plus REWIND mots, sans remonter avant le début de la phrase,
   // après une pause d'au moins 1,5 s survenue en lisant (pas après un déplacement volontaire)
@@ -752,9 +753,13 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   function delayFor(i) {
     const w = S.words[i];
     const base = 60000 / wpm;
-    const core = w.replace(/[^\p{L}\p{N}]/gu, '').length;
     let f = 1;
-    if (core > 6) f += Math.min(0.6, (core - 6) * 0.06);
+    // Rythme naturel : les mots vraiment longs (9 lettres et plus) restent un peu plus longtemps, +30 % au plus.
+    // Rythme régulier : tous les mots ont la même durée, seules la ponctuation et les fins de paragraphe marquent une pause.
+    if (rhythm === 'natural') {
+      const core = w.replace(/[^\p{L}\p{N}]/gu, '').length;
+      if (core > 8) f += Math.min(0.3, (core - 8) * 0.05);
+    }
     const last = w.replace(closers, '').slice(-1);
     if (/[.!?…]/.test(last) && !/^(?:M|Mme|Mlle|Dr|Pr|St|etc|vs|p|n°)\.$/i.test(w.replace(closers, ''))) f += 1.0;
     else if (/[,;:—–]/.test(last)) f += 0.5;
@@ -762,6 +767,12 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     return base * f;
   }
   const rampFactor = (k) => 1 + Math.max(0, (RAMP - k) / RAMP) * 1.2;
+
+  // Chaque mot reste affiché un nombre entier d'images de l'écran (arrondi au plus proche) : deux mots de même
+  // durée voulue durent exactement autant, au lieu d'alterner par exemple 8 et 9 images, et une image en retard
+  // allonge le mot affiché sans raccourcir le suivant. La durée d'une image est mesurée pendant la lecture.
+  let frameMs = 1000 / 60, lastFrame = 0;
+  const nextChange = (now, ms) => now + Math.max(1, Math.round(ms / frameMs)) * frameMs - frameMs / 2;
 
   function renderWord() {
     if (!S.words.length) return;
@@ -825,13 +836,15 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   function tick(now) {
     if (!reading) return;
+    const dt = now - lastFrame;
+    lastFrame = now;
+    if (dt > 4 && dt < frameMs * 1.5) frameMs += (dt - frameMs) * 0.1;   // images manquées ignorées
     if (now >= nextAt) {
       S.idx++;
       ramp++;
       renderWord();
       if (S.idx >= S.words.length - 1) { stop(); return; }
-      nextAt += delayFor(S.idx) * rampFactor(ramp);
-      if (nextAt < now - 40) nextAt = now;
+      nextAt = nextChange(now, delayFor(S.idx) * rampFactor(ramp));
     }
     raf = requestAnimationFrame(tick);
   }
@@ -852,7 +865,8 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     sessionStart = performance.now(); sessionFrom = S.idx;
     reading = true; ramp = 0;
     document.body.classList.add('reading');
-    nextAt = performance.now() + delayFor(S.idx) * rampFactor(0);
+    lastFrame = 0;
+    nextAt = nextChange(performance.now(), delayFor(S.idx) * rampFactor(0));
     raf = requestAnimationFrame(tick);
     saveTimer = setInterval(savePos, 5000);
     lockOn();
@@ -970,9 +984,9 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     setDlg.querySelector(`input[name=mode][value=${tapMode ? 'tap' : 'hold'}]`).checked = true;
     setDlg.querySelector(`input[name=size][value="${sizeIdx}"]`).checked = true;
     $('#rewind').checked = rewindOn;
-    $('#modeNote').textContent = tapMode
-      ? 'Touchez l’écran (ou Espace) pour lancer la lecture, puis à nouveau pour la mettre en pause.'
-      : 'Le texte défile tant que vous maintenez l’écran (ou la barre d’espace).';
+    setDlg.querySelector(`input[name=rhythm][value=${rhythm}]`).checked = true;
+    $('#rhythmNote').textContent = rhythm === 'natural' ? 'Mots longs un peu plus longtemps.' : 'Même durée pour chaque mot.';
+    $('#modeNote').textContent = tapMode ? 'Un toucher lance, un autre arrête.' : 'Défile tant que l’écran est maintenu.';
   }
   $('#btnSettings').addEventListener('click', () => { if (reading) return; syncSettings(); setDlg.showModal(); });
   $('#btnSetClose').addEventListener('click', () => setDlg.close());
@@ -982,6 +996,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     if (t.name === 'mode') { tapMode = t.value === 'tap'; LS.set('mode', t.value); }
     else if (t.name === 'size') { sizeIdx = +t.value; applySize(); renderWord(); }
     else if (t.id === 'rewind') { rewindOn = t.checked; LS.set('rewind', rewindOn); }
+    else if (t.name === 'rhythm') { rhythm = t.value; LS.set('rhythm', rhythm); }
     syncSettings();
     if (S.words.length) renderPause();
   });
@@ -1115,7 +1130,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   $('#btnUpdateLater').addEventListener('click', () => { $('#update').hidden = true; });
 
   // exposé pour les tests
-  window.__eclair = { tokenize, splitWord, S };
+  window.__eclair = { tokenize, splitWord, S, delayFor };
   window.__eclairReady = true;
   try { sessionStorage.removeItem('eclair.recover'); } catch { /* ignore */ }
 })();

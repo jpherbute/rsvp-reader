@@ -17,8 +17,10 @@ alignée sur un axe fixe (technique RSVP).
 - Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre, boutons ⏮ ⏭ sous la barre du
   haut avec le temps restant dans le chapitre. Ils viennent de la table des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT,
   les lignes du type « CHAPITRE IV. », « Livre premier »…
-- Vitesse : 100 à 1000 mots/min. Le rythme s'adapte : mots longs, virgules, fins de phrase et de paragraphe,
-  et une courte accélération progressive à chaque reprise.
+- Vitesse : 100 à 1000 mots/min. Chaque mot reste affiché un nombre entier d'images de l'écran, pour un défilement
+  régulier. Pauses aux virgules, fins de phrase et de paragraphe, et courte accélération progressive à chaque
+  reprise. Réglage *Rythme* : *Régulier* (même durée pour tous les mots) ou *Naturel* (mots longs un peu plus
+  longtemps).
 - Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.

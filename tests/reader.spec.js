@@ -210,3 +210,59 @@ test('mise en page : chapitres sous la barre du haut ; en paysage le mot reste d
   const ctx = await page.locator('#context').boundingBox(), bar2 = await page.locator('.bar.bottom').boundingBox();
   expect(ctx.y + ctx.height).toBeLessThanOrEqual(bar2.y);
 });
+
+test('rythme régulier : chaque mot sans ponctuation reste affiché le même nombre d’images', async ({ page }) => {
+  // (avant : à 425 mots/min, 141 ms = 8,5 images, les mots alternaient 8 et 9 images)
+  await page.evaluate(() => localStorage.setItem('eclair.wpm', '425'));
+  await page.reload();
+  await openBook(page, 'Roman');
+  await setIdx(page, 300); await refresh(page);
+  await page.evaluate(() => {
+    window.__changes = []; let last = -1;
+    const loop = (t) => { const i = window.__eclair.S.idx; if (i !== last) { window.__changes.push([i, t]); last = i; } requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  });
+  await page.keyboard.down('Space'); await page.waitForTimeout(6000); await page.keyboard.up('Space');
+  const frames = await page.evaluate(() => {
+    const { S } = window.__eclair, ch = window.__changes, start = ch[0][0];
+    const plain = (i) => !/[.!?…,;:—–]["»”’')\]]*$/.test(S.words[i]) && !S.paraEnd[i];
+    const out = [];
+    for (let k = 0; k + 1 < ch.length; k++) {
+      const [i, t] = ch[k];
+      if (i - start >= 9 && plain(i)) out.push(Math.round((ch[k + 1][1] - t) / (1000 / 60)));   // après le démarrage progressif
+    }
+    return out;
+  });
+  expect(frames.length).toBeGreaterThanOrEqual(12);
+  const same = frames.filter((f) => f === 8).length;           // 141 ms → 8 images à 60 Hz
+  expect(same / frames.length, JSON.stringify(frames)).toBeGreaterThanOrEqual(0.7);   // ancien code : 40 à 60 % ; marge pour les images irrégulières d’une machine chargée
+});
+
+test('réglage Rythme : régulier par défaut, naturel = mots longs un peu plus longtemps (30 % au plus)', async ({ page }) => {
+  const idx = await page.evaluate(() => {
+    const { S } = window.__eclair;
+    const plain = (i) => !/[.!?…,;:—–]["»”’')\]]*$/.test(S.words[i]) && !S.paraEnd[i];
+    const len = (w) => w.replace(/[^\p{L}\p{N}]/gu, '').length;
+    let short = -1, long = -1;
+    for (let i = 0; i < S.words.length && (short < 0 || long < 0); i++) {
+      if (!plain(i)) continue;
+      if (len(S.words[i]) <= 3 && short < 0) short = i;
+      if (len(S.words[i]) >= 12 && long < 0) long = i;
+    }
+    return { short, long };
+  });
+  expect(idx.short).toBeGreaterThanOrEqual(0);
+  expect(idx.long).toBeGreaterThanOrEqual(0);
+  const ratio = () => page.evaluate(({ short, long }) => window.__eclair.delayFor(long) / window.__eclair.delayFor(short), idx);
+  await page.click('#btnSettings');
+  await expect(page.locator('input[name=rhythm][value=regular]')).toBeChecked();
+  expect(await ratio()).toBe(1);
+  await page.locator('#settings label', { hasText: 'Naturel' }).click();
+  await expect(page.locator('#rhythmNote')).toHaveText(/mots longs/i);
+  const r = await ratio();
+  expect(r).toBeGreaterThan(1.15);
+  expect(r).toBeLessThanOrEqual(1.3);
+  await page.reload();
+  await openBook(page, 'Roman');
+  expect(await ratio()).toBe(r);                                // réglage conservé
+});
