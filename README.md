@@ -22,6 +22,10 @@ alignée sur un axe fixe (technique RSVP).
 - Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.
+- Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre.
+- **Partage vers l'app** (Android, application installée) : « Partager → Éclair » depuis un gestionnaire de
+  fichiers ou un téléchargement importe le livre. Non disponible sur iPhone/iPad, où Safari ne permet pas aux
+  applications web de recevoir un partage.
 
 ## Lancer en local
 

@@ -59,16 +59,25 @@
   }
 
   /* ------------------------------------------------------------------ *
-   *  Stockage (IndexedDB) : 'books' = métadonnées, 'texts' = contenu
+   *  Stockage (IndexedDB) : 'books' = métadonnées, 'texts' = contenu,
+   *  'covers' = vignette de couverture { id, blob } (depuis la version 2)
    * ------------------------------------------------------------------ */
   const dbp = new Promise((resolve, reject) => {
-    const r = indexedDB.open('eclair', 1);
+    const r = indexedDB.open('eclair', 2);
     r.onupgradeneeded = () => {
       const d = r.result;
-      d.createObjectStore('books', { keyPath: 'id' });
-      d.createObjectStore('texts');
+      if (!d.objectStoreNames.contains('books')) d.createObjectStore('books', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('texts')) d.createObjectStore('texts');
+      if (!d.objectStoreNames.contains('covers')) d.createObjectStore('covers', { keyPath: 'id' });
     };
-    r.onsuccess = () => resolve(r.result);
+    let blocked = false;
+    r.onblocked = () => { blocked = true; toast('Fermez les autres onglets d’Éclair pour terminer la mise à jour.', true); };
+    r.onsuccess = () => {
+      const d = r.result;
+      if (blocked) $('#toast').hidden = true;
+      d.onversionchange = () => d.close();   // ne pas bloquer une future mise à jour ouverte dans un autre onglet
+      resolve(d);
+    };
     r.onerror = () => reject(r.error);
   });
   async function dbReq(stores, mode, fn) {
@@ -218,6 +227,42 @@
     return entries;
   }
 
+  /* Image de couverture déclarée par l'EPUB : cover-image (EPUB 3), <meta name="cover"> (EPUB 2),
+     à défaut une image dont l'identifiant ou le nom contient « cover » */
+  function findCover(opf, manifest, base) {
+    const items = Object.values(manifest);
+    const isImg = (it) => !!it && /^image\//.test(it.getAttribute('media-type') || '');
+    let it = items.find((i) => /\bcover-image\b/.test(i.getAttribute('properties') || ''));
+    if (!isImg(it)) {
+      const m = [...opf.getElementsByTagNameNS('*', 'meta')].find((e) => e.getAttribute('name') === 'cover');
+      const ref = m && m.getAttribute('content');
+      it = ref && (items.find((i) => i.getAttribute('id') === ref) || items.find((i) => i.getAttribute('href') === ref));
+    }
+    if (!isImg(it)) it = items.find((i) => isImg(i) && /cover/i.test(`${i.getAttribute('id')} ${i.getAttribute('href')}`));
+    return isImg(it) ? { path: resolvePath(base, it.getAttribute('href')), type: it.getAttribute('media-type') } : null;
+  }
+
+  // Vignette JPEG de la couverture (240 px de large au plus) pour la bibliothèque
+  async function thumbnail(blob) {
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const nw = img.naturalWidth || 400, nh = img.naturalHeight || 600;
+      const w = Math.min(240, nw), h = Math.round((nh * w) / nw);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);   // fond blanc pour les PNG transparents
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, w, h);
+      return await new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.85));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function parseEpub(file) {
     const zip = await JSZip.loadAsync(file);
     const read = async (p) => { const f = zip.file(p); return f ? f.async('string') : null; };
@@ -274,7 +319,15 @@
     }
     listed.sort((a, b) => a.w - b.w);
     const chapters = listed.length > 1 || listed.length >= heads.length ? listed : heads;
+
+    let cover = null;
+    try {
+      const c = findCover(opf, manifest, base);
+      const f = c && zip.file(c.path);
+      if (f) cover = await thumbnail(new Blob([await f.async('arraybuffer')], { type: c.type }));
+    } catch (e) { console.warn('Couverture illisible', e); }
     return {
+      cover,
       title: meta('title') || file.name.replace(/\.epub$/i, ''),
       author: meta('creator'),
       text: parts.join('\n'),
@@ -310,9 +363,10 @@
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
       title: b.title, author: b.author, words, chapters: b.chapters, pos: 0, addedAt: Date.now(), openedAt: 0,
     };
-    await dbReq(['books', 'texts'], 'readwrite', (t) => {
+    await dbReq(['books', 'texts', 'covers'], 'readwrite', (t) => {
       t.objectStore('books').put(meta);
       t.objectStore('texts').put(b.text, meta.id);
+      if (b.cover) t.objectStore('covers').put({ id: meta.id, blob: b.cover });
     });
     return meta;
   }
@@ -352,30 +406,52 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   /* ------------------------------------------------------------------ *
    *  Bibliothèque
    * ------------------------------------------------------------------ */
+  let coverUrls = [];
+  function coverEl(b, blob) {
+    if (blob) {
+      const img = document.createElement('img');
+      img.className = 'cover'; img.alt = ''; img.src = URL.createObjectURL(blob);
+      coverUrls.push(img.src);
+      return img;
+    }
+    const ph = mk('cover ph', ((b.title || '').match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase());
+    ph.style.setProperty('--h', [...(b.title || '')].reduce((h, c) => (h * 31 + c.codePointAt(0)) % 360, 40));
+    return ph;
+  }
+
   async function refreshLibrary() {
-    const all = await dbReq('books', 'readonly', (t) => t.objectStore('books').getAll());
+    const [all, covers] = await Promise.all([
+      dbReq('books', 'readonly', (t) => t.objectStore('books').getAll()),
+      dbReq('covers', 'readonly', (t) => t.objectStore('covers').getAll()),
+    ]);
+    const coverOf = new Map(covers.map((c) => [c.id, c.blob]));
     all.sort((a, b) => (b.openedAt || b.addedAt) - (a.openedAt || a.addedAt));
     const list = $('#bookList');
     list.replaceChildren();
+    coverUrls.forEach((u) => URL.revokeObjectURL(u));
+    coverUrls = [];
     $('#empty').hidden = all.length > 0;
     for (const b of all) {
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.className = 'book';
       const pct = b.words > 1 ? Math.round((b.pos / (b.words - 1)) * 100) : 0;
-      btn.append(mk('t', b.title));
-      if (b.author) btn.append(mk('a', b.author));
-      btn.append(mk('m', `${pct} % lu · ${fmt(b.words)} mots`));
+      const txt = document.createElement('span');
+      txt.className = 'txt';
+      txt.append(mk('t', b.title));
+      if (b.author) txt.append(mk('a', b.author));
+      txt.append(mk('m', `${pct} % lu · ${fmt(b.words)} mots`));
       const bar = document.createElement('i'); bar.className = 'pbar';
       const fill = document.createElement('b'); fill.style.width = pct + '%';
-      bar.append(fill); btn.append(bar);
+      bar.append(fill); txt.append(bar);
+      btn.append(coverEl(b, coverOf.get(b.id)), txt);
       btn.addEventListener('click', () => openBook(b.id));
       const del = document.createElement('button');
       del.className = 'icon del'; del.innerHTML = svg('trash');
       del.setAttribute('aria-label', `Supprimer « ${b.title} »`);
       del.addEventListener('click', async () => {
         if (!confirm(`Supprimer « ${b.title} » de la bibliothèque ?`)) return;
-        await dbReq(['books', 'texts'], 'readwrite', (t) => { t.objectStore('books').delete(b.id); t.objectStore('texts').delete(b.id); });
+        await dbReq(['books', 'texts', 'covers'], 'readwrite', (t) => { for (const st of ['books', 'texts', 'covers']) t.objectStore(st).delete(b.id); });
         refreshLibrary();
       });
       li.append(btn, del);
@@ -751,7 +827,23 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   /* ------------------------------------------------------------------ *
    *  Démarrage
    * ------------------------------------------------------------------ */
+  // Livres partagés vers l'app (Android) : le service worker les dépose dans ce cache, on les importe ici
+  async function importShared() {
+    if (location.search.includes('partage')) history.replaceState(null, '', location.pathname);
+    if (!('caches' in window) || !(await caches.has('eclair-shared'))) return;
+    const cache = await caches.open('eclair-shared');
+    const keys = await cache.keys();
+    const files = [];
+    for (const k of keys) {
+      const r = await cache.match(k);
+      if (r) files.push(new File([await r.blob()], decodeURIComponent(r.headers.get('X-Name') || 'livre'), { type: r.headers.get('Content-Type') || '' }));
+    }
+    if (files.length) await importFiles(files);
+    await Promise.all(keys.map((k) => cache.delete(k)));
+  }
+
   refreshLibrary().catch((e) => { console.error(e); toast('Stockage local indisponible.'); });
+  importShared().catch((e) => { console.error(e); toast('Impossible d’importer le livre partagé.'); });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
