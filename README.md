@@ -29,6 +29,8 @@ alignée sur un axe fixe (technique RSVP).
   couvertures et les positions de lecture ; *Restaurer* (ou *Importer* ce fichier) ajoute les livres absents et,
   pour un livre déjà présent, garde la lecture la plus récente. Utile avant une réinstallation ou pour passer
   sur un autre appareil.
+- **Statistiques** (bouton graphique de la bibliothèque) : mots lus et temps de lecture du jour, série de jours
+  consécutifs, vitesse réelle moyenne, graphique des 7 derniers jours. Elles font partie de la sauvegarde.
 - **Mises à jour** : quand une nouvelle version est publiée, l'app la télécharge en entier en arrière-plan puis
   affiche « Nouvelle version disponible — Recharger ».
 - **Partage vers l'app** (Android, application installée) : « Partager → Éclair » depuis un gestionnaire de
@@ -77,4 +79,4 @@ tests/                tests Playwright (package.json ne sert qu'à eux)
 
 ## Idées suivantes
 
-Import PDF, statistiques de lecture, synchronisation entre appareils.
+Import PDF, synchronisation automatique entre appareils.

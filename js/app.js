@@ -36,6 +36,7 @@ addEventListener('error', () => {
     dfwd: '<path d="m5 6 6 6-6 6"/><path d="m12 6 6 6-6 6"/>',
     trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    chart: '<path d="M5 20v-8M12 20V5M19 20v-5M3.5 20h17"/>',
     download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
     upload: '<path d="M12 20V9M7.5 13.5 12 9l4.5 4.5M5 4h14"/>',
     list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
@@ -506,6 +507,117 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   $('#sort').addEventListener('change', (e) => { sortBy = e.target.value; LS.set('sort', sortBy); refreshLibrary(); });
 
   /* ------------------------------------------------------------------ *
+   *  Statistiques : mots lus et temps de lecture par jour,
+   *  localStorage 'stats' = { 'AAAA-MM-JJ': [mots, millisecondes] }
+   * ------------------------------------------------------------------ */
+  const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function recordReading(words, ms) {
+    if (!(words > 0)) return;
+    const st = LS.get('stats', {});
+    const k = dayKey(), e = st[k] || [0, 0];
+    st[k] = [e[0] + words, e[1] + Math.round(ms)];
+    LS.set('stats', st);
+  }
+  // Restauration : pour chaque jour on garde la valeur la plus haute (une même lecture n'est jamais comptée deux fois)
+  function mergeStats(other) {
+    if (!other || typeof other !== 'object') return;
+    const st = LS.get('stats', {});
+    for (const [k, v] of Object.entries(other)) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Array.isArray(v) && v[0] > ((st[k] || [0])[0])) st[k] = [+v[0] || 0, +v[1] || 0];
+    }
+    LS.set('stats', st);
+  }
+
+  const niceCeil = (v) => { if (v <= 0) return 0; const p = 10 ** Math.floor(Math.log10(v)), n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+  const statsDlg = $('#stats');
+
+  async function openStats() {
+    const st = LS.get('stats', {});
+    const all = Object.values(st);
+    const words = all.reduce((a, v) => a + v[0], 0), ms = all.reduce((a, v) => a + v[1], 0);
+    $('#statsEmpty').hidden = words > 0;
+    $('#statsBody').hidden = !words;
+    if (words) {
+      const today = st[dayKey()] || [0, 0];
+      $('#stToday').textContent = fmt(today[0]);
+      $('#stTodayTime').textContent = today[1] ? `mots · ${fmtTime(today[1] / 60000)} de lecture` : 'mots · pas encore lu';
+      // série : jours consécutifs avec lecture, jusqu'à aujourd'hui (ou hier si on n'a pas encore lu aujourd'hui)
+      const d = new Date();
+      if (!today[0]) d.setDate(d.getDate() - 1);
+      let streak = 0;
+      while ((st[dayKey(d)] || [0])[0] > 0) { streak++; d.setDate(d.getDate() - 1); }
+      $('#stStreak').textContent = `${streak} jour${streak > 1 ? 's' : ''}`;
+      $('#stStreakSub').textContent = streak > 1 ? 'd’affilée' : 'de lecture';
+      $('#stSpeed').textContent = ms ? fmt(Math.round(words / (ms / 60000))) : '–';
+      const books = await getAll('books');
+      const done = books.filter((b) => b.words > 1 && b.pos >= b.words - 1).length;
+      $('#stTotal').textContent = `Au total : ${fmt(words)} mots lus en ${fmtTime(ms / 60000)}`
+        + (done ? `, ${done} livre${done > 1 ? 's' : ''} terminé${done > 1 ? 's' : ''}.` : '.');
+      renderWeek(st);
+    }
+    statsDlg.showModal();
+  }
+
+  // Colonnes des 7 derniers jours : aujourd'hui en couleur d'accent, les autres jours en gris ;
+  // valeur au survol ou au focus, tableau équivalent pour les lecteurs d'écran
+  function renderWeek(st) {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      days.push({ d, v: st[dayKey(d)] || [0, 0], today: i === 0 });
+    }
+    const top = niceCeil(Math.max(...days.map((x) => x.v[0])));
+    const plot = $('#weekPlot'), tip = $('#weekTip');
+    plot.querySelectorAll('.gl, .cols').forEach((n) => n.remove());
+    for (const f of [1, 0.5]) {
+      const gl = document.createElement('div');
+      gl.className = 'gl'; gl.style.bottom = `${f * 100}%`;
+      gl.append(mk('', fmt(top * f)));
+      plot.insertBefore(gl, tip);   // derrière les colonnes
+    }
+    const cols = document.createElement('div');
+    cols.className = 'cols';
+    const rows = [];
+    for (const x of days) {
+      const long = x.d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+      const time = x.v[1] ? ` · ${fmtTime(x.v[1] / 60000)}` : '';
+      const col = document.createElement('button');
+      col.className = x.today ? 'col today' : 'col';
+      col.setAttribute('aria-label', `${x.today ? 'Aujourd’hui' : long} : ${fmt(x.v[0])} mots${time}`);
+      const h = top ? (x.v[0] / top) * 100 : 0;
+      const bar = document.createElement('i');
+      bar.style.height = x.v[0] ? `max(2px, ${h}%)` : '0';
+      col.append(bar);
+      if (x.today && x.v[0]) { const v = mk('v', fmt(x.v[0])); v.style.bottom = `calc(${h}% + 4px)`; col.append(v); }
+      const show = () => {
+        tip.replaceChildren(mk('', `${x.today ? 'Aujourd’hui' : long} · `), Object.assign(document.createElement('b'), { textContent: `${fmt(x.v[0])} mots` }), mk('', time));
+        tip.hidden = false;
+        const pw = plot.clientWidth, tw = tip.offsetWidth, cx = col.offsetLeft + col.offsetWidth / 2;
+        tip.style.left = `${Math.min(pw - tw / 2, Math.max(tw / 2, cx))}px`;
+        tip.style.bottom = `calc(${h}% + ${x.today && x.v[0] ? 24 : 8}px)`;
+      };
+      const hide = () => { tip.hidden = true; };
+      col.addEventListener('pointerenter', show);
+      col.addEventListener('focus', show);
+      col.addEventListener('pointerleave', hide);
+      col.addEventListener('blur', hide);
+      cols.append(col);
+      rows.push([x.today ? 'Aujourd’hui' : long, fmt(x.v[0]), x.v[1] ? fmtTime(x.v[1] / 60000) : '0']);
+    }
+    plot.insertBefore(cols, tip);
+    $('#weekDays').replaceChildren(...days.map((x) => mk('', x.today ? 'auj.' : x.d.toLocaleDateString('fr-FR', { weekday: 'short' }))));
+    const table = $('#weekTable');
+    table.replaceChildren();
+    const head = table.insertRow();
+    for (const t of ['Jour', 'Mots lus', 'Temps de lecture']) head.append(Object.assign(document.createElement('th'), { textContent: t }));
+    for (const r of rows) { const tr = table.insertRow(); for (const c of r) tr.insertCell().textContent = c; }
+  }
+
+  $('#btnStats').addEventListener('click', () => openStats().catch((e) => console.error(e)));
+  $('#btnStatsClose').addEventListener('click', () => statsDlg.close());
+  statsDlg.addEventListener('click', (e) => { if (e.target === statsDlg) statsDlg.close(); });
+
+  /* ------------------------------------------------------------------ *
    *  Sauvegarde / restauration : un .zip avec eclair.json (livres, positions),
    *  textes/<id>.txt et couvertures/<id>.jpg
    * ------------------------------------------------------------------ */
@@ -524,7 +636,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     toast('Préparation de la sauvegarde…', true);
     const [keys, texts] = await dbReq('texts', 'readonly', (t) => { const st = t.objectStore('texts'); return [st.getAllKeys(), st.getAll()]; });
     const zip = new JSZip();
-    zip.file('eclair.json', JSON.stringify({ app: 'eclair', version: 1, exportedAt: Date.now(), books }));
+    zip.file('eclair.json', JSON.stringify({ app: 'eclair', version: 1, exportedAt: Date.now(), books, stats: LS.get('stats', {}) }));
     keys.result.forEach((id, i) => zip.file(`textes/${id}.txt`, texts.result[i]));
     for (const c of await getAll('covers')) zip.file(`couvertures/${c.id}.jpg`, c.blob);
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
@@ -545,6 +657,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     const man = zip.file('eclair.json');
     const data = man && JSON.parse(await man.async('string'));
     if (!data || data.app !== 'eclair' || !Array.isArray(data.books)) throw new Error('ce fichier n’est pas une sauvegarde d’Éclair.');
+    mergeStats(data.stats);
     const existing = await getAll('books');
     let added = 0, updated = 0;
     for (const src of data.books) {
@@ -631,6 +744,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   // après une pause d'au moins 1,5 s survenue en lisant (pas après un déplacement volontaire)
   const REWIND = 4;
   let pausedAt = 0, canRewind = false;
+  let sessionStart = 0, sessionFrom = 0;   // pour les statistiques
 
   const elL = $('#wl'), elC = $('#wc'), elR = $('#wr'), elWord = $('#word'), elRail = $('#rail');
 
@@ -735,6 +849,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
       renderWord();
     }
     canRewind = false;
+    sessionStart = performance.now(); sessionFrom = S.idx;
     reading = true; ramp = 0;
     document.body.classList.add('reading');
     nextAt = performance.now() + delayFor(S.idx) * rampFactor(0);
@@ -746,6 +861,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     if (!reading) return;
     reading = false;
     pausedAt = performance.now(); canRewind = true;
+    recordReading(S.idx - sessionFrom, pausedAt - sessionStart);
     cancelAnimationFrame(raf);
     clearInterval(saveTimer);
     document.body.classList.remove('reading');

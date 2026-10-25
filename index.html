@@ -22,13 +22,14 @@
     <h1>Éclair</h1>
     <div class="lib-actions">
       <button class="icon" id="libTheme" aria-label="Changer de thème"></button>
+      <button class="icon" id="btnStats" aria-label="Statistiques de lecture" data-icon="chart"></button>
       <label class="btn primary" for="fileInput"><span data-icon="plus"></span>Importer</label>
       <input id="fileInput" type="file" accept=".epub,.txt,.text,application/epub+zip,text/plain" multiple hidden>
     </div>
   </header>
 
   <div class="lib-tools" id="libTools" hidden>
-    <input type="search" id="search" placeholder="Rechercher un titre, un auteur" aria-label="Rechercher dans la bibliothèque" autocomplete="off">
+    <input type="search" id="search" placeholder="Rechercher un livre" aria-label="Rechercher dans la bibliothèque" autocomplete="off">
     <select id="sort" aria-label="Trier la bibliothèque">
       <option value="recent">Récents</option>
       <option value="title">Titre</option>
@@ -137,6 +138,30 @@
         <label><input type="radio" name="size" value="3"><span class="aa" style="font-size: 1.6rem">Aa</span></label>
       </div>
     </fieldset>
+  </div>
+</dialog>
+
+<dialog id="stats" aria-labelledby="statsTitle">
+  <header class="toc-head">
+    <h2 id="statsTitle">Statistiques</h2>
+    <button class="icon" id="btnStatsClose" aria-label="Fermer" data-icon="close"></button>
+  </header>
+  <div class="set-body">
+    <p class="note" id="statsEmpty">Pas encore de lecture enregistrée : vos statistiques apparaîtront dès que vous aurez lu un peu.</p>
+    <div id="statsBody">
+      <div class="tiles">
+        <div class="tile"><span class="lbl">Aujourd’hui</span><span class="val" id="stToday"></span><span class="sub" id="stTodayTime"></span></div>
+        <div class="tile"><span class="lbl">Série</span><span class="val" id="stStreak"></span><span class="sub" id="stStreakSub"></span></div>
+        <div class="tile"><span class="lbl">Vitesse réelle</span><span class="val" id="stSpeed"></span><span class="sub">mots/min en moyenne</span></div>
+      </div>
+      <figure class="week">
+        <figcaption>Mots lus, 7 derniers jours</figcaption>
+        <div class="plot" id="weekPlot"><div class="tip" id="weekTip" hidden></div></div>
+        <div class="xlab" id="weekDays" aria-hidden="true"></div>
+        <table class="sr-only" id="weekTable"></table>
+      </figure>
+      <p class="note" id="stTotal"></p>
+    </div>
   </div>
 </dialog>
 
