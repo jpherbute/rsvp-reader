@@ -123,7 +123,7 @@ test('réglages : mode Toucher, reprise désactivée, taille, conservés au rech
   expect(rail.y + rail.height).toBeLessThanOrEqual(sheet.y + 1);     // le mot reste visible au-dessus du panneau
   await page.locator('#settings label', { hasText: 'Toucher' }).click();
   await page.locator('input[name=size][value="3"] + span').click();
-  await page.locator('label.check').click();
+  await page.locator('label.check', { hasText: 'revenir de quelques mots' }).click();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--scale').trim())).toBe('1.7');
   await page.keyboard.press('Escape');
   await expect(page.locator('#settings')).not.toBeVisible();
@@ -265,4 +265,41 @@ test('réglage Rythme : régulier par défaut, naturel = mots longs un peu plus 
   await page.reload();
   await openBook(page, 'Roman');
   expect(await ratio()).toBe(r);                                // réglage conservé
+});
+
+test('démarrage progressif désactivable : sans lui, les premiers mots ont tout de suite leur durée normale', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('eclair.wpm', '425'));
+  await page.reload();
+  await openBook(page, 'Roman');
+  // un passage dont les premiers mots n'ont pas de ponctuation
+  const s = await page.evaluate(() => {
+    const { S } = window.__eclair;
+    const plain = (i) => !/[.!?…,;:—–]["»”’')\]]*$/.test(S.words[i]) && !S.paraEnd[i];
+    for (let i = 200; i < S.words.length; i++) if ([0, 1, 2, 3].every((k) => plain(i + k))) return i;
+    return -1;
+  });
+  expect(s).toBeGreaterThan(0);
+  // durées (en images) des 2e et 3e mots affichés après le lancement
+  const firstWords = async () => {
+    await setIdx(page, s); await refresh(page);
+    await page.evaluate(() => {
+      window.__changes = []; let last = -1;
+      const loop = (t) => { const i = window.__eclair.S.idx; if (i !== last) { window.__changes.push([i, t]); last = i; } requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    });
+    await page.keyboard.down('Space'); await page.waitForTimeout(1800); await page.keyboard.up('Space');
+    return page.evaluate(() => { const ch = window.__changes; return [1, 2].map((k) => Math.round((ch[k + 1][1] - ch[k][1]) / (1000 / 60))); });
+  };
+  const withRamp = await firstWords();
+  expect(withRamp[0]).toBeGreaterThanOrEqual(14);               // ≈ ×2 au démarrage (8 images ×2,05)
+  await page.click('#btnSettings');
+  await expect(page.locator('#ramp')).toBeChecked();             // activé par défaut
+  await page.locator('label.check', { hasText: 'Démarrage progressif' }).click();
+  await page.keyboard.press('Escape');
+  const withoutRamp = await firstWords();
+  for (const f of withoutRamp) expect(f).toBeLessThanOrEqual(11);  // durée normale : 8 images (marge : images manquées d’une machine chargée)
+  await page.reload();
+  await openBook(page, 'Roman');
+  await page.click('#btnSettings');
+  await expect(page.locator('#ramp')).not.toBeChecked();         // réglage conservé
 });

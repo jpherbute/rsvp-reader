@@ -19,7 +19,7 @@ alignée sur un axe fixe (technique RSVP).
   les lignes du type « CHAPITRE IV. », « Livre premier »…
 - Vitesse : 100 à 1000 mots/min. Chaque mot reste affiché un nombre entier d'images de l'écran, pour un défilement
   régulier. Pauses aux virgules, fins de phrase et de paragraphe, et courte accélération progressive à chaque
-  reprise. Réglage *Rythme* : *Régulier* (même durée pour tous les mots) ou *Naturel* (mots longs un peu plus
+  reprise (désactivable dans les réglages). Réglage *Rythme* : *Régulier* (même durée pour tous les mots) ou *Naturel* (mots longs un peu plus
   longtemps).
 - Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture

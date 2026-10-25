@@ -741,6 +741,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   let tapMode = LS.get('mode', 'hold') === 'tap';   // toucher pour lancer / arrêter au lieu de maintenir
   let rhythm = LS.get('rhythm', 'regular') === 'natural' ? 'natural' : 'regular';   // durée des mots longs
   let rewindOn = LS.get('rewind', true);
+  let rampOn = LS.get('ramp', true);   // démarrage progressif : premiers mots plus lents à chaque reprise
   // Reprise : on revient d'au plus REWIND mots, sans remonter avant le début de la phrase,
   // après une pause d'au moins 1,5 s survenue en lisant (pas après un déplacement volontaire)
   const REWIND = 4;
@@ -766,7 +767,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     if (S.paraEnd[i]) f += 1.0;
     return base * f;
   }
-  const rampFactor = (k) => 1 + Math.max(0, (RAMP - k) / RAMP) * 1.2;
+  const rampFactor = (k) => (rampOn ? 1 + Math.max(0, (RAMP - k) / RAMP) * 1.2 : 1);
 
   // Chaque mot reste affiché un nombre entier d'images de l'écran (arrondi au plus proche) : deux mots de même
   // durée voulue durent exactement autant, au lieu d'alterner par exemple 8 et 9 images, et une image en retard
@@ -984,6 +985,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     setDlg.querySelector(`input[name=mode][value=${tapMode ? 'tap' : 'hold'}]`).checked = true;
     setDlg.querySelector(`input[name=size][value="${sizeIdx}"]`).checked = true;
     $('#rewind').checked = rewindOn;
+    $('#ramp').checked = rampOn;
     setDlg.querySelector(`input[name=rhythm][value=${rhythm}]`).checked = true;
     $('#rhythmNote').textContent = rhythm === 'natural' ? 'Mots longs un peu plus longtemps.' : 'Même durée pour chaque mot.';
     $('#modeNote').textContent = tapMode ? 'Un toucher lance, un autre arrête.' : 'Défile tant que l’écran est maintenu.';
@@ -996,6 +998,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     if (t.name === 'mode') { tapMode = t.value === 'tap'; LS.set('mode', t.value); }
     else if (t.name === 'size') { sizeIdx = +t.value; applySize(); renderWord(); }
     else if (t.id === 'rewind') { rewindOn = t.checked; LS.set('rewind', rewindOn); }
+    else if (t.id === 'ramp') { rampOn = t.checked; LS.set('ramp', rampOn); }
     else if (t.name === 'rhythm') { rhythm = t.value; LS.set('rhythm', rhythm); }
     syncSettings();
     if (S.words.length) renderPause();
