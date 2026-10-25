@@ -22,11 +22,15 @@ alignée sur un axe fixe (technique RSVP).
 - Thème clair (par défaut) / sombre ; mode de lecture, reprise et taille du texte dans les réglages.
 - Import **EPUB** (sans DRM) et **TXT**, par bouton ou glisser-déposer. Bibliothèque et position de lecture
   conservées localement (IndexedDB) ; fonctionne hors ligne une fois installée.
-- Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre.
+- Bibliothèque avec la couverture de chaque EPUB (vignette) ; à défaut, l'initiale du titre. À partir de 4 livres :
+  recherche dans les titres et les auteurs (sans tenir compte des accents) et tri (récents, titre, auteur,
+  progression).
 - **Sauvegarde** (en bas de la bibliothèque) : *Sauvegarder* télécharge un `.zip` avec les livres, leurs
   couvertures et les positions de lecture ; *Restaurer* (ou *Importer* ce fichier) ajoute les livres absents et,
   pour un livre déjà présent, garde la lecture la plus récente. Utile avant une réinstallation ou pour passer
   sur un autre appareil.
+- **Statistiques** (bouton graphique de la bibliothèque) : mots lus et temps de lecture du jour, série de jours
+  consécutifs, vitesse réelle moyenne, graphique des 7 derniers jours. Elles font partie de la sauvegarde.
 - **Mises à jour** : quand une nouvelle version est publiée, l'app la télécharge en entier en arrière-plan puis
   affiche « Nouvelle version disponible — Recharger ».
 - **Partage vers l'app** (Android, application installée) : « Partager → Éclair » depuis un gestionnaire de
@@ -43,6 +47,19 @@ python3 -m http.server 8000   # puis http://localhost:8000
 
 Un service worker et l'installation PWA exigent HTTPS ou `localhost`.
 
+## Tests
+
+Tests de bout en bout avec Playwright (Chromium), lancés automatiquement sur GitHub à chaque PR et à chaque mise
+à jour de `main` (`.github/workflows/tests.yml`). En local :
+
+```sh
+npm ci
+npx playwright install chromium   # la première fois
+npm test
+```
+
+Les livres d'essai sont générés au lancement des tests (`tests/fixtures.js`) : aucun accès réseau nécessaire.
+
 ## Déployer (GitHub Pages)
 
 Réglages du dépôt → Pages → *Deploy from a branch* → `main` / racine. Tous les chemins sont relatifs,
@@ -57,8 +74,9 @@ js/app.js             import EPUB/TXT, moteur RSVP, bibliothèque
 sw.js                 hors ligne, mises à jour d'un bloc, réception des partages
 manifest.webmanifest  installation PWA
 vendor/jszip.min.js   lecture des EPUB (JSZip, MIT)
+tests/                tests Playwright (package.json ne sert qu'à eux)
 ```
 
 ## Idées suivantes
 
-Import PDF, statistiques de lecture, synchronisation entre appareils.
+Import PDF, synchronisation automatique entre appareils.
