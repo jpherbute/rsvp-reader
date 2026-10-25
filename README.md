@@ -14,8 +14,8 @@ alignée sur un axe fixe (technique RSVP).
 - Pas à pas : boutons ‹ › (appui long = répétition), `«` `»` = phrase précédente/suivante ; toucher un mot du
   contexte s'y place. Clavier : `←` `→` (±1 mot, `Maj` = ±10), `↑` `↓` (vitesse), `Page↑` `Page↓` (chapitre),
   `Échap` (pause, puis bibliothèque).
-- Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre, boutons ⏮ ⏭ en bas avec le
-  temps restant dans le chapitre. Ils viennent de la table des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT,
+- Chapitres : bouton liste en haut du lecteur (en pause) pour sauter à un chapitre, boutons ⏮ ⏭ sous la barre du
+  haut avec le temps restant dans le chapitre. Ils viennent de la table des matières de l'EPUB (EPUB 3 ou 2) ; pour un TXT,
   les lignes du type « CHAPITRE IV. », « Livre premier »…
 - Vitesse : 100 à 1000 mots/min. Le rythme s'adapte : mots longs, virgules, fins de phrase et de paragraphe,
   et une courte accélération progressive à chaque reprise.

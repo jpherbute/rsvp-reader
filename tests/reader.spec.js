@@ -161,11 +161,50 @@ test('toucher un mot du contexte y place la lecture sans la lancer', async ({ pa
   expect(r.reading).toBe(false);
 });
 
-test('mise en page : le mot reste visible en paysage, le contexte au-dessus de la barre sur petit écran', async ({ page }) => {
+test('barre du haut : chaque bouton répond sur toute sa surface, la barre de progression reste utilisable', async ({ page }) => {
+  // (bug : la zone tactile de la barre de progression couvrait le haut des boutons → saut dans le livre)
+  for (const id of ['btnHome', 'btnToc', 'btnTheme', 'btnSettings', 'btnChapBack', 'btnChapFwd']) {
+    const b = await page.locator(`#${id}`).boundingBox();
+    for (const y of [b.y + 1, b.y + b.height / 2, b.y + b.height - 1]) {
+      const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y).closest('button')?.id, [b.x + b.width / 2, y]);
+      expect(hit, `${id} à y=${Math.round(y)}`).toBe(id);
+    }
+  }
+  const theme = await page.locator('#btnTheme').boundingBox();
+  const { idx } = await reader(page);
+  await page.mouse.click(theme.x + theme.width / 2, theme.y + 2);
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  expect((await reader(page)).idx).toBe(idx);
+  const prog = await page.locator('#progress').boundingBox();
+  await page.mouse.click(prog.x + prog.width / 2, prog.y + 2);           // la barre elle-même : on se déplace
+  const { n, idx: mid } = await reader(page);
+  expect(Math.abs(mid / (n - 1) - 0.5)).toBeLessThan(0.02);
+});
+
+test('le thème sombre est appliqué avant le script de l’app (barre d’état du téléphone)', async ({ browser, page }) => {
+  await page.evaluate(() => localStorage.setItem('eclair.theme', '"dark"'));
+  const state = await page.context().storageState();
+  // contexte sans service worker (sinon app.js viendrait de son cache) et sans app.js : seul le <head> agit
+  const ctx = await browser.newContext({ serviceWorkers: 'block', storageState: state });
+  const p = await ctx.newPage();
+  await p.route('**/js/app.js', (route) => route.abort());
+  await p.goto('/');
+  expect(await p.evaluate(() => [document.documentElement.dataset.theme, document.querySelector('meta[name=theme-color]').content, getComputedStyle(document.body).backgroundColor, !!window.__eclair]))
+    .toEqual(['dark', '#12110d', 'rgb(18, 17, 13)', false]);
+  await ctx.close();
+});
+
+test('mise en page : chapitres sous la barre du haut ; en paysage le mot reste dégagé ; sur petit écran le contexte reste visible', async ({ page }) => {
+  const home = await page.locator('#btnHome').boundingBox(), chap = await page.locator('#chapRow').boundingBox();
+  const rail = await page.locator('#rail').boundingBox();
+  expect(chap.y).toBeGreaterThanOrEqual(home.y + home.height);          // sous la ligne du titre…
+  expect(chap.y + chap.height).toBeLessThanOrEqual(rail.y);              // … et au-dessus du mot
   await page.setViewportSize({ width: 844, height: 390 });
   await refresh(page);
   const word = await page.locator('#word .c').boundingBox(), bar = await page.locator('.bar.bottom').boundingBox();
+  const top = await page.locator('.bar.top').boundingBox();
   expect(word.y + word.height).toBeLessThanOrEqual(bar.y);
+  expect(top.y + top.height).toBeLessThanOrEqual(word.y);
   await page.setViewportSize({ width: 375, height: 667 });
   await refresh(page);
   const ctx = await page.locator('#context').boundingBox(), bar2 = await page.locator('.bar.bottom').boundingBox();

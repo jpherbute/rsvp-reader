@@ -169,17 +169,17 @@ button { font: inherit; color: inherit; }
 .context .cur { color: var(--fg); font-weight: 700; }
 
 #progress {
-  position: absolute; top: 0; left: 0; right: 0; height: 5px; z-index: 5;
+  position: absolute; top: env(safe-area-inset-top); left: 0; right: 0; height: 5px; z-index: 5;
   background: var(--line); cursor: pointer; touch-action: none;
 }
-#progress::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 26px; }
+/* zone tactile élargie, qui s'arrête au-dessus des boutons de la barre du haut */
+#progress::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 14px; }
 #progressFill { display: block; height: 100%; width: 100%; background: var(--orp); transform-origin: 0 50%; transform: scaleX(0); }
 
 .bar { position: absolute; left: 0; right: 0; z-index: 4; }
-.bar.top {
-  top: 5px; display: flex; align-items: center; gap: 2px;
-  padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
-}
+.bar.top { top: calc(env(safe-area-inset-top) + 14px); padding: 0 10px 6px; }
+.top-row { display: flex; align-items: center; gap: 2px; }
+#chapRow { margin-top: 2px; }
 .titles { flex: 1; min-width: 0; padding: 0 6px; }
 .titles .t { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .titles .c { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.1em; }
@@ -199,10 +199,13 @@ input[type="range"] { flex: 1; accent-color: var(--orp); height: 32px; margin: 0
   .context { margin-top: 1rem; }
   .bar.bottom { gap: 6px; }
 }
-/* Écran large mais bas (téléphone à l'horizontale) : vitesse et chapitre côte à côte, pour ne pas masquer le mot */
+/* Écran large mais bas (téléphone à l'horizontale) : chapitre sur la même ligne que le titre, sans
+   l'indication d'usage, pour que la barre du haut ne déborde pas sur le mot */
 @media (max-height: 520px) and (min-width: 600px) {
-  .bar.bottom:has(#chapRow:not([hidden])) { grid-template-columns: 1fr 1fr; column-gap: 28px; }
-  .bar.bottom .words { grid-column: 1 / -1; }
+  .bar.top { display: flex; align-items: center; gap: 16px; }
+  .top-row { flex: 1; min-width: 0; }
+  #chapRow { flex: 0 1 24rem; margin: 0; }
+  .hint { visibility: hidden; }
 }
 
 /* ---------- liste des chapitres ---------- */
