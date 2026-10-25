@@ -2,6 +2,7 @@
 (() => {
   const $ = (s) => document.querySelector(s);
   const fmt = (n) => n.toLocaleString('fr-FR');
+  const mk = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; return s; };
 
   /* ------------------------------------------------------------------ *
    *  Préférences
@@ -21,6 +22,8 @@
     dfwd: '<path d="m5 6 6 6-6 6"/><path d="m12 6 6 6-6 6"/>',
     trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>',
   };
   const svg = (name) =>
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -123,7 +126,10 @@
    * ------------------------------------------------------------------ */
   const BLOCK = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'SECTION', 'ARTICLE', 'TR', 'PRE', 'DT', 'DD', 'FIGCAPTION', 'UL', 'OL', 'TABLE', 'HR']);
 
-  function htmlToText(html) {
+  const cleanText = (s) => s.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+
+  /* anchors : identifiants visés par la table des matières → marks : nombre de mots qui les précèdent */
+  function htmlToText(html, anchors) {
     const d = new DOMParser().parseFromString(html, 'text/html');
     d.querySelectorAll('script,style,nav,svg,img,head,[hidden]').forEach((n) => n.remove());
     d.querySelectorAll('a').forEach((a) => {
@@ -132,10 +138,12 @@
     });
     const heading = d.querySelector('h1,h2,h3');
     let out = '';
+    const at = {};
     (function walk(node) {
       for (const c of node.childNodes) {
         if (c.nodeType === 3) out += c.nodeValue.replace(/\s+/g, ' ');
         else if (c.nodeType === 1) {
+          if (anchors) { const id = c.id || c.getAttribute('name'); if (id && anchors.has(id) && !(id in at)) at[id] = out.length; }
           if (c.tagName === 'BR') { out += '\n'; continue; }
           const b = BLOCK.has(c.tagName);
           if (b) out += '\n';
@@ -144,11 +152,69 @@
         }
       }
     })(d.body || d);
-    const text = out.split('\n').map((s) => s.trim()).filter(Boolean).join('\n');
-    return { text, title: heading ? heading.textContent.replace(/\s+/g, ' ').trim() : '' };
+    // mots avant chaque ancre : lignes complètes déjà comptées + début de la ligne de l'ancre
+    const marks = {};
+    const lines = out.split('\n');
+    let k = 0, start = 0, before = 0;
+    for (const id of Object.keys(at).sort((a, b) => at[a] - at[b])) {
+      while (start + lines[k].length < at[id]) { before += tokenize(lines[k]).words.length; start += lines[k].length + 1; k++; }
+      marks[id] = before + tokenize(out.slice(start, at[id])).words.length;
+    }
+    return { text: cleanText(out), title: heading ? heading.textContent.replace(/\s+/g, ' ').trim() : '', marks };
   }
 
   const resolvePath = (base, href) => decodeURIComponent(new URL(href.split('#')[0], 'http://x/' + base).pathname.slice(1));
+
+  /* Table des matières de l'EPUB : nav (EPUB 3), sinon NCX (EPUB 2) → [{ title, path, frag, d }] */
+  async function readToc(opf, manifest, base, read) {
+    const entries = [];
+    const add = (title, href, from, d) => {
+      title = (title || '').replace(/\s+/g, ' ').trim();
+      if (!title || !href) return;
+      const frag = href.includes('#') ? decodeURIComponent(href.slice(href.indexOf('#') + 1)) : '';
+      entries.push({ title, path: resolvePath(from, href), frag, d });
+    };
+    const items = Object.values(manifest);
+
+    const navItem = items.find((it) => /\bnav\b/.test(it.getAttribute('properties') || ''));
+    const navPath = navItem && resolvePath(base, navItem.getAttribute('href'));
+    const navHtml = navPath && await read(navPath);
+    if (navHtml) {
+      const d = new DOMParser().parseFromString(navHtml, 'text/html');
+      const nav = [...d.querySelectorAll('nav')].find((n) => /\btoc\b/.test(n.getAttribute('epub:type') || n.getAttribute('role') || '')) || d.querySelector('nav');
+      const walk = (ol, depth) => {
+        for (const li of ol.children) {
+          const a = li.querySelector(':scope > a, :scope > span');
+          if (a) add(a.textContent, a.getAttribute('href'), navPath, depth);
+          const sub = li.querySelector(':scope > ol');
+          if (sub) walk(sub, depth + 1);
+        }
+      };
+      const ol = nav && nav.querySelector('ol');
+      if (ol) walk(ol, 0);
+    }
+    if (entries.length) return entries;
+
+    const spine = opf.getElementsByTagNameNS('*', 'spine')[0];
+    const ncxItem = manifest[spine && spine.getAttribute('toc')] || items.find((it) => /ncx/.test(it.getAttribute('media-type') || ''));
+    const ncxPath = ncxItem && resolvePath(base, ncxItem.getAttribute('href'));
+    const ncx = ncxPath && await read(ncxPath);
+    if (ncx) {
+      const doc = new DOMParser().parseFromString(ncx, 'application/xml');
+      const kids = (n, name) => [...n.children].filter((c) => c.localName === name);
+      const walk = (n, depth) => {
+        for (const np of kids(n, 'navPoint')) {
+          const label = kids(np, 'navLabel')[0];
+          const content = kids(np, 'content')[0];
+          add(label && label.textContent, content && content.getAttribute('src'), ncxPath, depth);
+          walk(np, depth + 1);
+        }
+      };
+      const map = doc.getElementsByTagNameNS('*', 'navMap')[0];
+      if (map) walk(map, 0);
+    }
+    return entries;
+  }
 
   async function parseEpub(file) {
     const zip = await JSZip.loadAsync(file);
@@ -163,8 +229,13 @@
     const manifest = {};
     for (const it of opf.getElementsByTagNameNS('*', 'item')) manifest[it.getAttribute('id')] = it;
 
+    const toc = await readToc(opf, manifest, base, read);
+    const anchors = {};
+    for (const e of toc) if (e.frag) (anchors[e.path] ||= new Set()).add(e.frag);
+
     const parts = [];
-    const chapters = [];
+    const heads = [];
+    const starts = {};
     let count = 0;
     for (const ref of opf.getElementsByTagNameNS('*', 'itemref')) {
       const item = manifest[ref.getAttribute('idref')];
@@ -172,16 +243,35 @@
       const type = item.getAttribute('media-type') || '';
       if (!/x?html/.test(type)) continue;
       if (/\bnav\b/.test(item.getAttribute('properties') || '')) continue;
-      const html = await read(resolvePath(base, item.getAttribute('href')));
+      const path = resolvePath(base, item.getAttribute('href'));
+      const html = await read(path);
       if (!html) continue;
-      const { text, title } = htmlToText(html);
+      const { text, title, marks } = htmlToText(html, anchors[path]);
+      starts[path] = { w: count, marks };
       const n = tokenize(text).words.length;
       if (!n) continue;
-      if (title) chapters.push({ title, w: count });
+      if (title) heads.push({ title, w: count });
       parts.push(text);
       count += n;
     }
     if (!count) throw new Error('Aucun texte trouvé dans cet EPUB (DRM ?).');
+
+    // Chapitres : table des matières du livre, à défaut le premier titre de chaque fichier
+    const listed = [];
+    for (const e of toc) {
+      const s = starts[e.path];
+      if (!s) continue;
+      const w = Math.min(count - 1, s.w + ((e.frag && s.marks[e.frag]) || 0));
+      const prev = listed[listed.length - 1];
+      if (!prev || prev.w !== w || prev.title !== e.title) listed.push({ title: e.title, w, d: e.d });
+    }
+    // « Chapitre I » suivi de son unique sous-titre (« Monsieur Myriel ») : une seule entrée
+    for (let i = 0; i < listed.length - 1; i++) {
+      const a = listed[i], c = listed[i + 1], next = listed[i + 2];
+      if (c.d === a.d + 1 && c.w - a.w <= 8 && (!next || next.d <= a.d)) { a.title += ' — ' + c.title; listed.splice(i + 1, 1); }
+    }
+    listed.sort((a, b) => a.w - b.w);
+    const chapters = listed.length > 1 || listed.length >= heads.length ? listed : heads;
     return {
       title: meta('title') || file.name.replace(/\.epub$/i, ''),
       author: meta('creator'),
@@ -189,6 +279,10 @@
       chapters,
     };
   }
+
+  // Titres de chapitre d'un TXT : « CHAPITRE IV. », « Livre premier », « Part 2 », « Prologue », « XIV »…
+  const TXT_HEAD = /^(?:(?:chapitre|chapter|partie|part|livre|book|tome)\s+(?:\d+|[ivxlcdm]+|premi[eè]re?|[a-zé-]+i[eè]me|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|one|two|three|four|five|seven|eight|nine|ten)(?![\p{L}\p{N}])|(?:prologue|[ée]pilogue|pr[ée]face|avant-propos)\.?$)/iu;
+  const TXT_ROMAN = /^[IVXLC]+\.?$/;
 
   async function parseText(file) {
     const buf = await file.arrayBuffer();
@@ -198,7 +292,14 @@
     const blanks = (s.match(/\n\s*\n/g) || []).length;
     if (blanks > 3) s = s.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean).join('\n');
     if (!s.trim()) throw new Error('Fichier vide.');
-    return { title: file.name.replace(/\.(txt|text)$/i, ''), author: '', text: s, chapters: [] };
+    const chapters = [];
+    let w = 0;
+    for (const line of s.split('\n')) {
+      const l = line.trim();
+      if (l.length <= 160 && (TXT_HEAD.test(l) || TXT_ROMAN.test(l))) chapters.push({ title: l.length > 120 ? l.slice(0, 119) + '…' : l, w });
+      w += tokenize(line).words.length;
+    }
+    return { title: file.name.replace(/\.(txt|text)$/i, ''), author: '', text: s, chapters: chapters.length > 1 ? chapters : [] };
   }
 
   async function saveBook(b) {
@@ -259,7 +360,6 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.className = 'book';
-      const mk = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; return s; };
       const pct = b.words > 1 ? Math.round((b.pos / (b.words - 1)) * 100) : 0;
       btn.append(mk('t', b.title));
       if (b.author) btn.append(mk('a', b.author));
@@ -346,13 +446,14 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     const h = Math.floor(min / 60);
     return `${h} h ${String(Math.round(min % 60)).padStart(2, '0')}`;
   }
-  function chapterAt(i) {
+  function chapterIdx(i) {
     const ch = S.book && S.book.chapters;
-    if (!ch || !ch.length) return '';
+    if (!ch || !ch.length) return -1;
     let lo = 0, hi = ch.length - 1, ans = -1;
     while (lo <= hi) { const m = (lo + hi) >> 1; if (ch[m].w <= i) { ans = m; lo = m + 1; } else hi = m - 1; }
-    return ans >= 0 ? ch[ans].title : '';
+    return ans;
   }
+  const chapterAt = (i) => { const k = chapterIdx(i); return k >= 0 ? S.book.chapters[k].title : ''; };
   function renderPause() {
     const n = S.words.length;
     const ctx = $('#context');
@@ -442,6 +543,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     S.book = meta; S.words = tk.words; S.paraEnd = tk.paraEnd;
     S.idx = Math.min(meta.pos || 0, Math.max(0, S.words.length - 1));
     $('#rTitle').textContent = meta.title;
+    $('#btnToc').hidden = !(meta.chapters && meta.chapters.length);
     $('#library').hidden = true;
     $('#reader').hidden = false;
     history.pushState({ reader: 1 }, '');
@@ -452,6 +554,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
 
   function showLibrary() {
     stop();
+    if (tocDlg.open) tocDlg.close();
     if (S.book) savePos();
     S.book = null; S.words = [];
     $('#reader').hidden = true;
@@ -462,6 +565,33 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
     if (history.state && history.state.reader) history.back(); else showLibrary();
   });
   addEventListener('popstate', () => { if (!$('#reader').hidden) showLibrary(); });
+
+  /* --- Liste des chapitres --- */
+  const tocDlg = $('#toc');
+  function openToc() {
+    const ch = (S.book && S.book.chapters) || [];
+    if (reading || !ch.length) return;
+    const n = S.words.length, cur = chapterIdx(S.idx);
+    const list = $('#tocList');
+    list.replaceChildren();
+    let curBtn = null;
+    ch.forEach((c, k) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.className = 'toc-item';
+      b.style.setProperty('--depth', Math.min(c.d || 0, 3));
+      b.append(mk('t', c.title), mk('p', `${n > 1 ? Math.round((c.w / (n - 1)) * 100) : 0} %`));
+      if (k === cur) { b.classList.add('cur'); b.setAttribute('aria-current', 'true'); curBtn = b; }
+      b.addEventListener('click', () => { tocDlg.close(); go(c.w); savePos(); });
+      li.append(b);
+      list.append(li);
+    });
+    tocDlg.showModal();
+    if (curBtn) { curBtn.focus({ preventScroll: true }); curBtn.scrollIntoView({ block: 'center' }); }
+  }
+  $('#btnToc').addEventListener('click', openToc);
+  $('#btnTocClose').addEventListener('click', () => tocDlg.close());
+  tocDlg.addEventListener('click', (e) => { if (e.target === tocDlg) tocDlg.close(); });
 
   /* --- Appui maintenu = lecture ; relâchement = pause --- */
   const stage = $('#stage');
@@ -482,7 +612,7 @@ Au-delà de cinq cents mots par minute, la compréhension demande davantage de c
   /* --- Clavier --- */
   let spaceDown = false;
   addEventListener('keydown', (e) => {
-    if ($('#reader').hidden) return;
+    if ($('#reader').hidden || tocDlg.open) return;
     switch (e.code) {
       case 'Space': e.preventDefault(); if (!e.repeat && !spaceDown) { spaceDown = true; start(); } break;
       case 'ArrowLeft': e.preventDefault(); step(e.shiftKey ? -10 : -1); break;
