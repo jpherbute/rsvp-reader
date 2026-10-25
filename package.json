@@ -1,0 +1,11 @@
+{
+  "name": "eclair-rsvp-reader",
+  "private": true,
+  "description": "Éclair, lecteur RSVP (PWA). Le site n'a pas d'étape de build : ce fichier ne sert qu'aux tests.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

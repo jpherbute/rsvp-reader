@@ -43,6 +43,19 @@ python3 -m http.server 8000   # puis http://localhost:8000
 
 Un service worker et l'installation PWA exigent HTTPS ou `localhost`.
 
+## Tests
+
+Tests de bout en bout avec Playwright (Chromium), lancés automatiquement sur GitHub à chaque PR et à chaque mise
+à jour de `main` (`.github/workflows/tests.yml`). En local :
+
+```sh
+npm ci
+npx playwright install chromium   # la première fois
+npm test
+```
+
+Les livres d'essai sont générés au lancement des tests (`tests/fixtures.js`) : aucun accès réseau nécessaire.
+
 ## Déployer (GitHub Pages)
 
 Réglages du dépôt → Pages → *Deploy from a branch* → `main` / racine. Tous les chemins sont relatifs,
@@ -57,6 +70,7 @@ js/app.js             import EPUB/TXT, moteur RSVP, bibliothèque
 sw.js                 hors ligne, mises à jour d'un bloc, réception des partages
 manifest.webmanifest  installation PWA
 vendor/jszip.min.js   lecture des EPUB (JSZip, MIT)
+tests/                tests Playwright (package.json ne sert qu'à eux)
 ```
 
 ## Idées suivantes
